@@ -13,8 +13,8 @@ anyhow = "1.0.37"
 
 [dependencies.serenity]
 # version = "0.9"
-git = "https://github.com/louy2/serenity.git"
-branch = "add-static-face"
+git = "https://github.com/nickelc/serenity.git"
+branch = "tokio-1.0/reqwest"
 
 [dependencies.tokio]
 version = "1"

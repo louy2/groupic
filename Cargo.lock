@@ -161,7 +161,7 @@ dependencies = [
 [[package]]
 name = "command_attr"
 version = "0.3.2"
-source = "git+https://github.com/louy2/serenity.git?branch=add-static-face#af43b5fd3eaec568fce687ffb2556815efd87aa2"
+source = "git+https://github.com/nickelc/serenity.git?branch=tokio-1.0/reqwest#28fbfbca128f215c0ece7501365fa4c6fdf58da3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1040,7 +1040,7 @@ dependencies = [
 [[package]]
 name = "serenity"
 version = "0.9.3"
-source = "git+https://github.com/louy2/serenity.git?branch=add-static-face#af43b5fd3eaec568fce687ffb2556815efd87aa2"
+source = "git+https://github.com/nickelc/serenity.git?branch=tokio-1.0/reqwest#28fbfbca128f215c0ece7501365fa4c6fdf58da3"
 dependencies = [
  "async-trait",
  "async-tungstenite",

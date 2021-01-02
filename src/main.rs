@@ -10,6 +10,9 @@ use std::env;
 use tracing::{error, info};
 use tracing_subscriber;
 
+mod util;
+use util::*;
+
 #[group]
 #[commands(ping, avatar)]
 struct General;
