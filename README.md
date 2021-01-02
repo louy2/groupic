@@ -25,3 +25,10 @@ On `/grouppicend` command:
 
 The intent identity is necessary for accessing user avatars.
 
+## Details about how to generate the group picture
+
+Each participant's avatar is downloaded as a 128x128 png file. The group picture consists of a header of the gathering title, followed by however many rows of 10-avatar rows.
+
+10 avatars being 1280px wide, with 10px in between and 20px on the sides, 130px spacing in total, the group picture is 1410px wide.
+
+The header is 40px tall.
