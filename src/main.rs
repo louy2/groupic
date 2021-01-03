@@ -61,6 +61,7 @@ async fn log_command_user(_: &Context, msg: &Message, command_name: &str) -> boo
     true
 }
 
+/// Reply to command "Pong!"
 #[command]
 async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     if let Err(why) = msg.reply(ctx, "Pong!").await {
@@ -70,6 +71,7 @@ async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+/// Reply to command the sender's static avatar
 #[command]
 async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
     if let Err(why) = msg.reply(ctx, msg.author.static_face()).await {
