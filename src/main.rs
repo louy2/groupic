@@ -14,7 +14,7 @@ mod util;
 use util::*;
 
 #[group]
-#[commands(ping, avatar, nick)]
+#[commands(ping, avatar, nick, react)]
 struct General;
 
 struct Handler;
@@ -91,6 +91,21 @@ async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
     let content = format!("In response to message of {}", nick);
     if let Err(why) = msg.channel_id.say(ctx, content).await {
         error!("Error sending message {:?}", why)
+    }
+    Ok(())
+}
+
+/// Reply to command and add a reaction to the reply
+#[command]
+async fn react(ctx: &Context, msg: &Message) -> CommandResult {
+    let content = "See the reaction below".to_string();
+    match msg.reply(ctx, content).await {
+        Ok(m) => {
+            if let Err(why) = m.react(ctx, '📷').await {
+                error!("Error reacting to message {:?}", why)
+            }
+        }
+        Err(why) => error!("Error sending message {:?}", why)
     }
     Ok(())
 }
