@@ -14,7 +14,7 @@ mod util;
 use util::*;
 
 #[group]
-#[commands(ping, avatar)]
+#[commands(ping, avatar, nick)]
 struct General;
 
 struct Handler;
@@ -78,5 +78,19 @@ async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
         error!("Error sending message {:?}", why)
     }
 
+    Ok(())
+}
+
+/// Show nickname of command sender in a following message, not reply
+#[command]
+async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
+    let nick = msg
+        .author_nick(ctx)
+        .await
+        .unwrap_or(msg.author.name.clone());
+    let content = format!("In response to message of {}", nick);
+    if let Err(why) = msg.channel_id.say(ctx, content).await {
+        error!("Error sending message {:?}", why)
+    }
     Ok(())
 }
