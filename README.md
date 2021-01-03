@@ -25,6 +25,8 @@ On `/grouppicend` command:
 
 The intent identity is necessary for accessing user avatars.
 
+The permission Send Message is necessary for sending message to a channel.
+
 ## Details about how to generate the group picture
 
 Each participant's avatar is downloaded as a 128x128 png file. The group picture consists of a header of the gathering title, followed by however many rows of 10-avatar rows.
