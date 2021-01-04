@@ -1,17 +1,30 @@
-use serenity::async_trait;
+use dashmap::{DashMap};
 use serenity::client::{Client, Context, EventHandler};
 use serenity::framework::standard::{
     macros::{command, group, hook},
     CommandResult, StandardFramework,
 };
 use serenity::model::channel::Message;
+use serenity::{
+    async_trait,
+    model::id::{ChannelId, MessageId},
+    prelude::TypeMapKey,
+};
 
-use std::env;
+use std::{env, sync::Arc};
 use tracing::{error, info};
 use tracing_subscriber;
 
 mod util;
 use util::*;
+
+/// Map of channels with a group pic session active to
+/// the pair of join message and list of participants message
+struct GroupPicSessions;
+
+impl TypeMapKey for GroupPicSessions {
+    type Value = Arc<DashMap<ChannelId, (MessageId, MessageId)>>;
+}
 
 #[group]
 #[commands(ping, avatar, nick, react, grouppicbegin)]
@@ -43,6 +56,14 @@ async fn main() {
         .framework(framework)
         .await
         .expect("Error creating client");
+
+    // Initialize the set of channels with a group pic session active
+    // and the map of messages with join reaction to messages of list of participants
+    // enclosed in a block to drop the lock asap
+    {
+        let mut data = client.data.write().await;
+        data.insert::<GroupPicSessions>(Arc::new(DashMap::new()));
+    }
 
     // start listening for events by starting a single shard
     if let Err(why) = client.start().await {
@@ -105,28 +126,60 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
                 error!("Error reacting to message {:?}", why)
             }
         }
-        Err(why) => error!("Error sending message {:?}", why)
+        Err(why) => error!("Error sending message {:?}", why),
     }
     Ok(())
 }
 
 /// Create a group picture session
-/// 
+///
 #[command]
 async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
-    let content = "Join the group picture session by reacting with 📷 below".to_string();
-    match msg.reply(ctx, content).await {
-        Ok(m) => {
-            if let Err(why) = m.react(ctx, '📷').await {
-                error!("Error reacting to message {:?}", why)
+    // check if the channel already has a session
+    let group_pic_sessions = {
+        let data = ctx.data.read().await;
+        let map = data.get::<GroupPicSessions>().unwrap().clone();
+        map
+    };
+
+    if group_pic_sessions.contains_key(&msg.channel_id) {
+        let join_msg_id = group_pic_sessions.get(&msg.channel_id).unwrap().0;
+        match msg.channel_id.message(ctx, join_msg_id).await {
+            Ok(join_msg) => {
+                let content = format!("A group picture session is already active in this channel at {}", join_msg.link());
+                if let Err(why) = msg.reply(ctx, content).await {
+                    error!("Error sending message {:?}", why)
+                } else {
+                    return Ok(())
+                }
+            }
+            Err(why) => {
+                // A session is active but the message cannot be found.
+                // The message may have been deleted by the mod.
+                // Start a new session instead TODO
+                error!("Error finding message {:?}", why)
             }
         }
-        Err(why) => error!("Error sending message {:?}", why)
     }
-    match msg.reply(ctx, "List of participants:").await {
-        Ok(m) => {
+    let content = "Join the group picture session by reacting with 📷 below".to_string();
+    match msg.reply(ctx, content).await {
+        Ok(m1) => {
+            if let Err(why) = m1.react(ctx, '📷').await {
+                error!("Error reacting to message {:?}", why)
+            }
+            match msg.reply(ctx, "List of participants:").await {
+                Ok(m2) => {
+                    // Save the channel id, the join message and the list of participants
+                    // to the map of sessions
+                    group_pic_sessions.insert(msg.channel_id, (m1.id, m2.id));
+                }
+                Err(why) => error!("Error sending message {:?}", why),
+            }
         }
-        Err(why) => error!("Error sending message {:?}", why)
+        Err(why) => {
+            error!("Error sending message {:?}", why);
+        }
     }
+    
     Ok(())
 }
