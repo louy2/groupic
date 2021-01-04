@@ -14,7 +14,7 @@ mod util;
 use util::*;
 
 #[group]
-#[commands(ping, avatar, nick, react)]
+#[commands(ping, avatar, nick, react, grouppicbegin)]
 struct General;
 
 struct Handler;
@@ -104,6 +104,27 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
             if let Err(why) = m.react(ctx, '📷').await {
                 error!("Error reacting to message {:?}", why)
             }
+        }
+        Err(why) => error!("Error sending message {:?}", why)
+    }
+    Ok(())
+}
+
+/// Create a group picture session
+/// 
+#[command]
+async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
+    let content = "Join the group picture session by reacting with 📷 below".to_string();
+    match msg.reply(ctx, content).await {
+        Ok(m) => {
+            if let Err(why) = m.react(ctx, '📷').await {
+                error!("Error reacting to message {:?}", why)
+            }
+        }
+        Err(why) => error!("Error sending message {:?}", why)
+    }
+    match msg.reply(ctx, "List of participants:").await {
+        Ok(m) => {
         }
         Err(why) => error!("Error sending message {:?}", why)
     }
