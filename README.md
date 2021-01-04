@@ -34,3 +34,25 @@ Each participant's avatar is downloaded as a 128x128 png file. The group picture
 10 avatars being 1280px wide, with 10px in between and 20px on the sides, 130px spacing in total, the group picture is 1410px wide.
 
 The header is 40px tall.
+
+## User facing error messages
+
+For each channel only one group picture session can be active. If `/grouppicbegin` is sent to a channel it creates a session which lasts until `/grouppicend` is sent in the same channel.
+
+```
+/grouppicbegin
+*normal group picture session message*
+/grouppicbegin
+reply: a group picture session is already active in this channel at *session message link*
+```
+
+If `/grouppicend` is sent to a channel without an active group picture session
+
+```
+/grouppicend
+reply: No group picture session active in this channel. If you'd like to create one, use `/grouppicbegin`.
+```
+
+## Recovery from failure
+
+The bot maintains in memory a set of channels with active group picture session and a mapping from the reaction message to the corresponding list of participants message. In case of a crash or shutdown, this information should be persisted to a SQLite database.
