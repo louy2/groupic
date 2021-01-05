@@ -11,7 +11,7 @@ use serenity::{
     prelude::TypeMapKey,
 };
 
-use std::{env, sync::Arc};
+use std::{env, sync::Arc, unimplemented};
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -27,7 +27,7 @@ impl TypeMapKey for GroupPicSessions {
 }
 
 #[group]
-#[commands(ping, avatar, nick, react, grouppicbegin)]
+#[commands(ping, avatar, nick, react, grouppicbegin, grouppicend, grouppiccancel)]
 struct General;
 
 struct Handler;
@@ -192,4 +192,14 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
     }
     
     Ok(())
+}
+
+#[command]
+async fn grouppicend(ctx: &Context, msg: &Message) -> CommandResult {
+    unimplemented!();
+}
+
+#[command]
+async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
+    unimplemented!();
 }
