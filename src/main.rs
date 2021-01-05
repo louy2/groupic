@@ -150,11 +150,14 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
         match msg.channel_id.message(ctx, join_msg_id).await {
             // if found, reply with the link and return
             Ok(join_msg) => {
-                let content = format!("A group picture session is already active in this channel at {}", join_msg.link());
+                let content = format!(
+                    "A group picture session is already active in this channel at {}",
+                    join_msg.link()
+                );
                 if let Err(why) = msg.reply(ctx, content).await {
                     error!("Error sending message {:?}", why)
                 } else {
-                    return Ok(())
+                    return Ok(());
                 }
             }
             // if not found, what's the reason?
@@ -162,10 +165,12 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
             // it may also just be a network problem.
             // should just report error and add an abort command
             Err(why) => {
-                // A session is active but the message cannot be found.
-                // The message may have been deleted by the mod.
-                // Start a new session instead TODO
-                error!("Error finding message {:?}", why)
+                let content = "A group picture session \
+                is active in this channel but the join message \
+                is not available. You can cancel the session with grouppiccancel.";
+                msg.reply(ctx, content).await?;
+                error!("Error finding message {:?}", why);
+                return Ok(());
             }
         }
     }
