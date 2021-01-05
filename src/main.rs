@@ -1,4 +1,4 @@
-use dashmap::{DashMap};
+use dashmap::DashMap;
 use serenity::client::{Client, Context, EventHandler};
 use serenity::framework::standard::{
     macros::{command, group, hook},
@@ -195,7 +195,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
             error!("Error sending message {:?}", why);
         }
     }
-    
+
     Ok(())
 }
 
