@@ -214,5 +214,26 @@ async fn grouppicend(ctx: &Context, msg: &Message) -> CommandResult {
 
 #[command]
 async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
-    unimplemented!();
+    // check if the channel already has a session
+    let group_pic_sessions = {
+        let data = ctx.data.read().await;
+        let map = data.get::<GroupPicSessions>().unwrap().clone();
+        map
+    };
+    // if so, cancel the session:
+    // 1. remove the channel from map
+    // 2. delete the join and list message
+    // 3. reply with success or log failure
+    if group_pic_sessions.contains_key(&msg.channel_id) {
+        let (join_msg_id, list_msg_id) = group_pic_sessions.remove(&msg.channel_id).unwrap().1;
+        match msg.channel_id.delete_messages(ctx, vec![join_msg_id, list_msg_id]).await {
+            Ok(()) => {
+                msg.reply(ctx, "Group picture session cancelled. You can start a new one with ~grouppicbegin.").await.unwrap();
+            }
+            Err(why) => {
+                error!("Error sending message {:?}", why);
+            }
+        }
+    }
+    Ok(())
 }
