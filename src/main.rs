@@ -132,7 +132,13 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 /// Create a group picture session
+/// 
+/// Replies to the command message with two messages:
+/// 1. a message with a camera reaction
+/// 2. a message with a list of participants
 ///
+/// A user can click on the camera reaction to become a participant.
+/// The nickname of the user is appended to the List of participants.
 #[command]
 async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
     // check if the channel already has a session
@@ -165,11 +171,13 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
             // it may also just be a network problem.
             // should just report error and add an abort command
             Err(why) => {
+                error!("Error finding message {:?}", why);
                 let content = "A group picture session \
                 is active in this channel but the join message \
                 is not available. You can cancel the session with grouppiccancel.";
-                msg.reply(ctx, content).await?;
-                error!("Error finding message {:?}", why);
+                if let Err(why) = msg.reply(ctx, content).await {
+                    error!("Error sending message {:?}", why);
+                }
                 return Ok(());
             }
         }
