@@ -147,6 +147,7 @@ async fn group_pic_sessions(ctx: &Context) -> Arc<DashMap<ChannelId, (MessageId,
 /// A user can click on the camera reaction to become a participant.
 /// The nickname of the user is appended to the List of participants.
 #[command]
+#[only_in(guilds)]
 async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
     let group_pic_sessions = group_pic_sessions(ctx).await;
     // if a session is already active in the channel
@@ -220,11 +221,13 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
 }
 
 #[command]
+#[only_in(guilds)]
 async fn grouppicend(ctx: &Context, msg: &Message) -> CommandResult {
     unimplemented!();
 }
 
 #[command]
+#[only_in(guilds)]
 async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
     // check if the channel already has a session
     // if so, cancel the session:
