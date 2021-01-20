@@ -131,6 +131,13 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
+async fn group_pic_sessions(ctx: &Context) -> Arc<DashMap<ChannelId, (MessageId, MessageId)>> {
+    let data = ctx.data.read().await;
+    let sessions = data.get::<GroupPicSessions>().unwrap().clone();
+    
+    sessions
+}
+
 /// Create a group picture session
 /// 
 /// Replies to the command message with two messages:
@@ -141,17 +148,10 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
 /// The nickname of the user is appended to the List of participants.
 #[command]
 async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
-    // check if the channel already has a session
-    let group_pic_sessions = {
-        let data = ctx.data.read().await;
-        let map = data.get::<GroupPicSessions>().unwrap().clone();
-        map
-    };
-
+    let group_pic_sessions = group_pic_sessions(ctx).await;
     // if a session is already active in the channel
-    if group_pic_sessions.contains_key(&msg.channel_id) {
-        // look for the join message id
-        let join_msg_id = group_pic_sessions.get(&msg.channel_id).unwrap().0;
+    if let Some(session) = group_pic_sessions.get(&msg.channel_id) {
+        let (join_msg_id, _) = *session;
         // find the join message in the channel
         match msg.channel_id.message(ctx, join_msg_id).await {
             // if found, reply with the link and return
@@ -161,10 +161,9 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                     join_msg.link()
                 );
                 if let Err(why) = msg.reply(ctx, content).await {
-                    error!("Error sending message {:?}", why)
-                } else {
-                    return Ok(());
+                    error!("Error sending message: {:?}", why)
                 }
+                return Ok(());
             }
             // if not found, what's the reason?
             // the message may have been deleted by the mod.
@@ -176,7 +175,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                 is active in this channel but the join message \
                 is not available. You can cancel the session with grouppiccancel.";
                 if let Err(why) = msg.reply(ctx, content).await {
-                    error!("Error sending message {:?}", why);
+                    error!("Error sending message: {:?}", why);
                 }
                 return Ok(());
             }
@@ -184,12 +183,13 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
     }
 
     // start new group picture session
-    let content = "Join the group picture session by reacting with 📷 below".to_string();
-    match msg.reply(ctx, content).await {
+    match msg.channel_id.send_message(ctx, |m| {
+        m.reference_message(msg);
+        m.content("Join the group picture session by reacting with 📷 below");
+        m.reactions(vec!['📷']);
+        m
+    }).await {
         Ok(m1) => {
-            if let Err(why) = m1.react(ctx, '📷').await {
-                error!("Error reacting to message {:?}", why)
-            }
             match msg.reply(ctx, "List of participants:").await {
                 Ok(m2) => {
                     // Save the channel id, the join message and the list of participants
@@ -200,9 +200,9 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
             }
         }
         Err(why) => {
-            error!("Error sending message {:?}", why);
+            error!("Error sending message: {:?}", why);
         }
-    }
+    };
 
     Ok(())
 }
@@ -215,23 +215,18 @@ async fn grouppicend(ctx: &Context, msg: &Message) -> CommandResult {
 #[command]
 async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
     // check if the channel already has a session
-    let group_pic_sessions = {
-        let data = ctx.data.read().await;
-        let map = data.get::<GroupPicSessions>().unwrap().clone();
-        map
-    };
     // if so, cancel the session:
     // 1. remove the channel from map
     // 2. delete the join and list message
     // 3. reply with success or log failure
-    if group_pic_sessions.contains_key(&msg.channel_id) {
-        let (join_msg_id, list_msg_id) = group_pic_sessions.remove(&msg.channel_id).unwrap().1;
+    if let Some((_, (join_msg_id, list_msg_id))) = group_pic_sessions(ctx).await.remove(&msg.channel_id) {
         match msg.channel_id.delete_messages(ctx, vec![join_msg_id, list_msg_id]).await {
             Ok(()) => {
-                msg.reply(ctx, "Group picture session cancelled. You can start a new one with ~grouppicbegin.").await.unwrap();
+                let content = "Group picture session cancelled. You can start a new session with ~grouppicbegin.";
+                msg.reply(ctx, content).await.unwrap();
             }
             Err(why) => {
-                error!("Error sending message {:?}", why);
+                error!("Error deleting message: {:?}", why);
             }
         }
     }
