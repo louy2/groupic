@@ -160,8 +160,9 @@ dependencies = [
 
 [[package]]
 name = "command_attr"
-version = "0.3.2"
-source = "git+https://github.com/nickelc/serenity.git?branch=tokio-1.0/reqwest#28fbfbca128f215c0ece7501365fa4c6fdf58da3"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef54b146e4ff8a036b9d632fd48c183c9757992535e5f557275f4a01dfd9c7c7"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -210,6 +211,7 @@ dependencies = [
  "dashmap",
  "serenity",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
 ]
@@ -891,8 +893,9 @@ checksum = "3b181ba2dcf07aaccad5448e8ead58db5b742cf85dfe035e2227f137a539a189"
 
 [[package]]
 name = "reqwest"
-version = "0.10.10"
-source = "git+https://github.com/seanmonstar/reqwest#1f425a0244bcd7b4565dceb9076450d951f2ec03"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd281b1030aa675fb90aa994d07187645bb3c8fc756ca766e7c3070b439de9de"
 dependencies = [
  "base64 0.13.0",
  "bytes 1.0.0",
@@ -1050,8 +1053,9 @@ dependencies = [
 
 [[package]]
 name = "serenity"
-version = "0.9.3"
-source = "git+https://github.com/nickelc/serenity.git?branch=tokio-1.0/reqwest#28fbfbca128f215c0ece7501365fa4c6fdf58da3"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dac8367ecfd3380c00dcedf5eb9a47888ae74ae391419b5b1f7735895ed8df4"
 dependencies = [
  "async-trait",
  "async-tungstenite",

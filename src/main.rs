@@ -7,11 +7,13 @@ use serenity::framework::standard::{
 use serenity::model::channel::Message;
 use serenity::{
     async_trait,
+    collector::reaction_collector::ReactionAction,
     model::id::{ChannelId, MessageId},
     prelude::TypeMapKey,
 };
 
-use std::{env, sync::Arc, unimplemented};
+use std::{env, sync::Arc, time::Duration, unimplemented};
+use tokio_stream::StreamExt;
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -181,14 +183,14 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                 return Ok(());
             }
         }
-    } 
+    }
 
     // start new group picture session
     match msg
         .channel_id
         .send_message(ctx, |m| {
             m.reference_message(msg);
-            m.content("Join the group picture session by reacting with 📷 below");
+            m.content("Join the group picture session by reacting with 📷 below. This session will end in 30 minutes.");
             m.reactions(vec!['📷']);
             m
         })
@@ -208,6 +210,56 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                     // the join message,
                     // the list of participants message
                     group_pic_sessions.insert(msg.channel_id, (m1.id, m2.id));
+
+                    // create stream of reactions to the join message
+                    let mut s = m1
+                        .await_reactions(&ctx.shard)
+                        // only process camera reaction
+                        .filter(|r| r.emoji == '📷'.into())
+                        // process added reaction
+                        .added(true)
+                        // process removed reaction too
+                        .removed(true)
+                        // timeout 30 minutes
+                        .timeout(Duration::from_secs(1800))
+                        .await;
+                    // for each reaction event
+                    while let Some(ra) = s.next().await {
+                        match ra.as_ref() {
+                            // for each added reaction to the join message
+                            // add the nickname of the user to the participants message
+                            ReactionAction::Added(r) => {
+                                let nickname = {
+                                    let u = r.user(ctx).await?;
+                                    // with only_in(guilds) r.guild_id.unwrap() should not fail
+                                    u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name)
+                                };
+                                let content = m2.content.clone();
+                                m2.edit(ctx, |m| {
+                                    m.content(format!("{}\n{}", content, nickname));
+                                    m
+                                })
+                                .await?
+                            }
+                            // for each removed reaction to the join message
+                            // remove the nickname of the user to the participants message
+                            ReactionAction::Removed(r) => {
+                                let nickname_to_remove = {
+                                    let u = r.user(ctx).await?;
+                                    // with only_in(guilds) r.guild_id.unwrap() should not fail
+                                    let n =
+                                        u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name);
+                                    format!("\n{}", n)
+                                };
+                                let content = m2.content.replace(nickname_to_remove.as_str(), "");
+                                m2.edit(ctx, |m| {
+                                    m.content(content);
+                                    m
+                                })
+                                .await?
+                            }
+                        }
+                    }
                 }
                 Err(why) => error!("Error sending message {:?}", why),
             }
