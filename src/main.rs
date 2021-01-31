@@ -157,6 +157,14 @@ async fn group_pic_sessions(ctx: &Context) -> Arc<DashMap<ChannelId, GroupPicSes
     sessions
 }
 
+macro_rules! reply_msg_and_log_error {
+    ($ctx:ident, $msg:expr, $content:expr $(,)?) => {
+        if let Err(why) = ($msg).reply($ctx, $content).await {
+            error!("Error sending message: {:?}", why)
+        }
+    };
+}
+
 /// Create a group picture session
 ///
 /// Replies to the command message with two messages:
@@ -179,9 +187,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                     "A group picture session is already active in this channel at {}",
                     join_msg.link()
                 );
-                if let Err(why) = msg.reply(ctx, content).await {
-                    error!("Error sending message: {:?}", why)
-                }
+                reply_msg_and_log_error!(ctx, msg, content);
                 return Ok(());
             }
             // if not found, what's the reason?
@@ -193,9 +199,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                 let content = "A group picture session \
                 is active in this channel but the join message \
                 is not available. You can cancel the session with grouppiccancel.";
-                if let Err(why) = msg.reply(ctx, content).await {
-                    error!("Error sending message: {:?}", why);
-                }
+                reply_msg_and_log_error!(ctx, msg, content);
                 return Ok(());
             }
         }
@@ -330,30 +334,28 @@ async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
         // 1) timeout has been triggered 2) the session has ended
         // no need to cancel either way
         if let Err(_) = session.stopjoin_chan.send(StopJoin) {
-            msg.reply(
-                ctx,
+            reply_msg_and_log_error!(
+                ctx, msg,
                 "Group pic session is not active in this channel. \
                 You can start a new session with ~grouppicbegin."
-            ).await?;
+            );
         }
         // delete the join and participants messages
         let _ = msg.channel_id
             .delete_message(ctx, session.join_msg)
             .await;
         let _ = msg.channel_id.delete_message(ctx, session.participants_msg).await;
-        msg.reply(
-            ctx,
+        reply_msg_and_log_error!(
+            ctx, msg,
             "Group picture session in this channel is cancelled. \
             You can start a new session with ~grouppicbegin.",
-        )
-        .await?;
+        );
     } else {
-        msg.reply(
-            ctx,
+        reply_msg_and_log_error!(
+            ctx, msg,
             "Group pic session is not active in this channel. \
             You can start a new session with ~grouppicbegin.",
-        )
-        .await?;
+        );
     }
     Ok(())
 }
