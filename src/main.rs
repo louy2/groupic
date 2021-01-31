@@ -2,7 +2,8 @@ use dashmap::DashMap;
 use serenity::client::{Client, Context, EventHandler};
 use serenity::framework::standard::{
     macros::{command, group, hook},
-    CommandResult, StandardFramework,
+    CommandResult, CommandError,
+    StandardFramework,
 };
 use serenity::model::channel::Message;
 use serenity::{
@@ -56,6 +57,7 @@ async fn main() {
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
         .before(log_command_user)
+        .after(after_hook)
         .group(&GENERAL_GROUP);
 
     // Login with a bot token from the environment
@@ -89,6 +91,14 @@ async fn log_command_user(_: &Context, msg: &Message, command_name: &str) -> boo
     );
 
     true
+}
+
+#[hook]
+#[instrument(level = "debug")]
+async fn after_hook(_: &Context, _: &Message, command_name: &str, error: Result<(), CommandError>) {
+    if let Err(why) = error {
+        error!("{:?} in {}", why, command_name);
+    }
 }
 
 /// Reply to command "Pong!"
