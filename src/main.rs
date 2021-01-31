@@ -14,6 +14,7 @@ use serenity::{
 
 use std::{env, sync::Arc, time::Duration, unimplemented};
 use tokio_stream::StreamExt;
+use tokio::{select, sync::oneshot::Sender};
 use tracing::{error, info};
 use tracing_subscriber;
 
@@ -22,10 +23,16 @@ use util::*;
 
 /// Map of channels with a group pic session active to
 /// the pair of join message and list of participants message
+struct StopJoin;
+struct GroupPicSession {
+    join_msg: MessageId,
+    participants_msg: MessageId,
+    stopjoin_chan: Sender<StopJoin>
+}
 struct GroupPicSessions;
 
 impl TypeMapKey for GroupPicSessions {
-    type Value = Arc<DashMap<ChannelId, (MessageId, MessageId)>>;
+    type Value = Arc<DashMap<ChannelId, GroupPicSession>>;
 }
 
 #[group]
@@ -133,7 +140,7 @@ async fn react(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-async fn group_pic_sessions(ctx: &Context) -> Arc<DashMap<ChannelId, (MessageId, MessageId)>> {
+async fn group_pic_sessions(ctx: &Context) -> Arc<DashMap<ChannelId, GroupPicSession>> {
     let data = ctx.data.read().await;
     let sessions = data.get::<GroupPicSessions>().unwrap().clone();
 
@@ -154,9 +161,8 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
     let group_pic_sessions = group_pic_sessions(ctx).await;
     // if a session is already active in the channel
     if let Some(session) = group_pic_sessions.get(&msg.channel_id) {
-        let (join_msg_id, _) = *session;
         // find the join message in the channel
-        match msg.channel_id.message(ctx, join_msg_id).await {
+        match msg.channel_id.message(ctx, session.join_msg).await {
             // if found, reply with the link and return
             Ok(join_msg) => {
                 let content = format!(
@@ -209,7 +215,16 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                     // the channel id,
                     // the join message,
                     // the list of participants message
-                    group_pic_sessions.insert(msg.channel_id, (m1.id, m2.id));
+                    // the end / cancel channel
+                    let (tx, mut rx) = tokio::sync::oneshot::channel();
+                    group_pic_sessions.insert(
+                        msg.channel_id, 
+                        GroupPicSession {
+                            join_msg: m1.id,
+                            participants_msg: m2.id,
+                            stopjoin_chan: tx,
+                        }
+                    );
 
                     // create stream of reactions to the join message
                     let mut s = m1
@@ -224,39 +239,50 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                         .timeout(Duration::from_secs(1800))
                         .await;
                     // for each reaction event
-                    while let Some(ra) = s.next().await {
-                        match ra.as_ref() {
-                            // for each added reaction to the join message
-                            // add the nickname of the user to the participants message
-                            ReactionAction::Added(r) => {
-                                let nickname = {
-                                    let u = r.user(ctx).await?;
-                                    // with only_in(guilds) r.guild_id.unwrap() should not fail
-                                    u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name)
-                                };
-                                let content = m2.content.clone();
-                                m2.edit(ctx, |m| {
-                                    m.content(format!("{}\n{}", content, nickname));
-                                    m
-                                })
-                                .await?
+                    loop {
+                        // select between the stream and the stopjoin channel
+                        // once stopjoin signal is received the loop breaks
+                        select! {
+                            // get reaction event
+                            Some(ra) = s.next() => {
+                                match ra.as_ref() {
+                                    // for each added reaction to the join message
+                                    // add the nickname of the user to the participants message
+                                    ReactionAction::Added(r) => {
+                                        let nickname = {
+                                            let u = r.user(ctx).await?;
+                                            // with only_in(guilds) r.guild_id.unwrap() should not fail
+                                            u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name)
+                                        };
+                                        let content = m2.content.clone();
+                                        m2.edit(ctx, |m| {
+                                            m.content(format!("{}\n{}", content, nickname));
+                                            m
+                                        })
+                                        .await?
+                                    }
+                                    // for each removed reaction to the join message
+                                    // remove the nickname of the user to the participants message
+                                    ReactionAction::Removed(r) => {
+                                        let nickname_to_remove = {
+                                            let u = r.user(ctx).await?;
+                                            // with only_in(guilds) r.guild_id.unwrap() should not fail
+                                            let n =
+                                                u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name);
+                                            format!("\n{}", n)
+                                        };
+                                        let content = m2.content.replace(nickname_to_remove.as_str(), "");
+                                        m2.edit(ctx, |m| {
+                                            m.content(content);
+                                            m
+                                        })
+                                        .await?
+                                    }
+                                }
                             }
-                            // for each removed reaction to the join message
-                            // remove the nickname of the user to the participants message
-                            ReactionAction::Removed(r) => {
-                                let nickname_to_remove = {
-                                    let u = r.user(ctx).await?;
-                                    // with only_in(guilds) r.guild_id.unwrap() should not fail
-                                    let n =
-                                        u.nick_in(ctx, r.guild_id.unwrap()).await.unwrap_or(u.name);
-                                    format!("\n{}", n)
-                                };
-                                let content = m2.content.replace(nickname_to_remove.as_str(), "");
-                                m2.edit(ctx, |m| {
-                                    m.content(content);
-                                    m
-                                })
-                                .await?
+                            _ = &mut rx => {
+                                info!("The join for session in channel {} is stopped", msg.channel_id);
+                                break;
                             }
                         }
                     }
@@ -286,12 +312,25 @@ async fn grouppiccancel(ctx: &Context, msg: &Message) -> CommandResult {
     // 1. remove the channel from map
     // 2. delete the join and list message
     // 3. reply with success or log failure
-    if let Some((_, (join_msg_id, list_msg_id))) =
+    if let Some((_, session)) =
         group_pic_sessions(ctx).await.remove(&msg.channel_id)
     {
-        msg.channel_id
-            .delete_messages(ctx, vec![join_msg_id, list_msg_id])
-            .await?;
+        // stop join for join message
+        // if this fails then
+        // 1) timeout has been triggered 2) the session has ended
+        // no need to cancel either way
+        if let Err(_) = session.stopjoin_chan.send(StopJoin) {
+            msg.reply(
+                ctx,
+                "Group pic session is not active in this channel. \
+                You can start a new session with ~grouppicbegin."
+            ).await?;
+        }
+        // delete the join and participants messages
+        let _ = msg.channel_id
+            .delete_message(ctx, session.join_msg)
+            .await;
+        let _ = msg.channel_id.delete_message(ctx, session.participants_msg).await;
         msg.reply(
             ctx,
             "Group picture session in this channel is cancelled. \
