@@ -56,3 +56,9 @@ reply: No group picture session active in this channel. If you'd like to create 
 ## Recovery from failure
 
 The bot maintains in memory a set of channels with active group picture session and a mapping from the reaction message to the corresponding list of participants message. In case of a crash or shutdown, this information should be persisted to a SQLite database.
+
+## References
+
+* Structured multi-threaded logging: [tracing](https://docs.rs/tracing/0.1.25/tracing/index.htm)
+* Discord API: [serenity](https://docs.rs/serenity/0.10.4/serenity/index.html)
+* Embedded database: [sled](https://docs.rs/sled/0.34.6/sled/index.html)
