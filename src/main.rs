@@ -21,6 +21,7 @@ use tracing_subscriber;
 
 mod util;
 use util::*;
+mod gen_pic;
 
 /// Map of channels with a group pic session active to
 /// the pair of join message and list of participants message
