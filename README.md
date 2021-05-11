@@ -29,11 +29,9 @@ The permission Send Message is necessary for sending message to a channel.
 
 ## Details about how to generate the group picture
 
-Each participant's avatar is downloaded as a 128x128 png file. The group picture consists of a header of the gathering title, followed by however many rows of 10-avatar rows.
+Each participant's avatar is downloaded as a 128x128 png file. The group picture consists of a header of the gathering title, followed by however many rows of 5-avatar rows.
 
-10 avatars being 1280px wide, with 10px in between and 20px on the sides, 130px spacing in total, the group picture is 1410px wide.
-
-The header is 40px tall.
+The header is 64px tall.
 
 ## User facing error messages
 
@@ -56,6 +54,10 @@ reply: No group picture session active in this channel. If you'd like to create 
 ## Recovery from failure (TODO)
 
 The bot maintains in memory a set of channels with active group picture session and a mapping from the reaction message to the corresponding list of participants message. In case of a crash or shutdown, this information should be persisted to a SQLite database.
+
+## Image Processing
+
+`image-rs` is used to process PNG avatar images. `rusttype` is used to layout the gathering title in the header.
 
 ## Other Utility Commands
 
