@@ -16,8 +16,8 @@ mod tests {
     use super::*;
     use image::{GenericImage, ImageBuffer, Pixel};
     use rand::prelude::*;
-    use std::path::Path;
     use std::fs;
+    use std::path::Path;
 
     fn generate_random_test_avatars_in_dir_with_size<P>(dir: P, size: u32)
     where
