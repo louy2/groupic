@@ -1,15 +1,93 @@
 #![allow(dead_code)]
 
-use image::{ImageBuffer, Rgba, RgbaImage};
+use std::{fs, path::Path};
+
+use image::{GenericImage, ImageBuffer, Pixel, Rgba};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
 
-fn new_imagebuffer_with_discord_bg(width: u32, height: u32) -> RgbaImage {
-    ImageBuffer::from_pixel(width, height, DISCORD_COLOR)
+pub fn generate_group_pic<I, O>(avatars_dir: I, out_group_pic_path: O)
+where
+    I: AsRef<Path>,
+    O: AsRef<Path>,
+{
+    // configure the group pic
+    let num_of_avatars_in_a_row = 5_u32;
+    let header_h = 64;
+    let header_text = "niji3rd-live-day1";
+    let header_font_size = 54;
+    let mask_radius = 64;
+    let avatars_dir = avatars_dir.as_ref();
+
+    // calculate the rest of the configuration
+    let num_of_avatars = fs::read_dir(avatars_dir).unwrap().count() as u32;
+    let num_of_rows = num_of_avatars / num_of_avatars_in_a_row
+        + if num_of_avatars % num_of_avatars_in_a_row == 0 {
+            0
+        } else {
+            1
+        };
+    let group_pic_w = 128 * num_of_avatars_in_a_row;
+    let group_pic_h = header_h + 128 * num_of_rows;
+
+    // prepare the image buffer
+    let mut group_pic = ImageBuffer::from_pixel(group_pic_w, group_pic_h, DISCORD_COLOR);
+    // println!("{:?}", group_pic.dimensions());
+
+    // render the header
+    let font = rusttype::Font::try_from_bytes(FONT_DATA).expect("error loading font");
+    let scale = rusttype::Scale::uniform(header_font_size as f32);
+    let v_metrics = font.v_metrics(scale);
+    let layout: Vec<_> = font
+        .layout(header_text, scale, rusttype::point(0.0, v_metrics.ascent))
+        .collect();
+    let layout_h = (v_metrics.ascent - v_metrics.descent).ceil() as u32;
+    let layout_w = {
+        let min_x = layout.first().unwrap().pixel_bounding_box().unwrap().min.x;
+        let max_x = layout.last().unwrap().pixel_bounding_box().unwrap().min.x;
+        (max_x - min_x) as u32
+    };
+    let x_offset = (group_pic_w - layout_w) / 2;
+    let y_offset = (header_h - layout_h) / 2;
+    for glyph in layout {
+        let bounding_box = glyph.pixel_bounding_box().unwrap();
+        glyph.draw(|x, y, v| {
+            group_pic
+                .get_pixel_mut(
+                    x_offset + x + bounding_box.min.x as u32,
+                    y_offset + y + bounding_box.min.y as u32,
+                )
+                .blend(&image::Rgba([240, 240, 240, (v * 255.0) as u8]))
+        })
+    }
+
+    // mask and tile the avatars
+    for (i, avatar_path) in fs::read_dir(avatars_dir).unwrap().enumerate() {
+        let avatar_path = avatar_path.unwrap().path();
+        let mut avatar_img = image::open(&avatar_path).unwrap().into_rgba8();
+        for (x, y, p) in avatar_img.enumerate_pixels_mut() {
+            if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
+                >= mask_radius * mask_radius
+            {
+                p.0.copy_from_slice(&DISCORD_COLOR.0);
+            }
+        }
+        let x_offset = i as u32 % num_of_avatars_in_a_row * 128;
+        let y_offset = i as u32 / num_of_avatars_in_a_row * 128 + header_h;
+        // println!(
+        //     "{:#?}: {:?} {:?}",
+        //     avatar_path,
+        //     avatar_img.dimensions(),
+        //     (x_offset, y_offset)
+        // );
+        group_pic
+            .copy_from(&avatar_img, x_offset, y_offset)
+            .unwrap();
+    }
+
+    group_pic.save(out_group_pic_path.as_ref()).unwrap();
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -165,80 +243,6 @@ mod tests {
 
     #[test]
     fn generate_full_group_pic() {
-        // configure the group pic
-        let num_of_avatars_in_a_row = 5_u32;
-        let header_h = 64;
-        let header_text = "niji3rd-live-day1";
-        let header_font_size = 54;
-        let mask_radius = 64;
-        let avatars_dir = Path::new("tmp/test_avatars");
-
-        // calculate the rest of the configuration
-        let num_of_avatars = fs::read_dir(avatars_dir).unwrap().count() as u32;
-        let num_of_rows = num_of_avatars / num_of_avatars_in_a_row
-            + if num_of_avatars % num_of_avatars_in_a_row == 0 {
-                0
-            } else {
-                1
-            };
-        let group_pic_w = 128 * num_of_avatars_in_a_row;
-        let group_pic_h = header_h + 128 * num_of_rows;
-
-        // prepare the image buffer
-        let mut group_pic = ImageBuffer::from_pixel(group_pic_w, group_pic_h, DISCORD_COLOR);
-        // println!("{:?}", group_pic.dimensions());
-
-        // render the header
-        let font = rusttype::Font::try_from_bytes(super::FONT_DATA).expect("error loading font");
-        let scale = rusttype::Scale::uniform(header_font_size as f32);
-        let v_metrics = font.v_metrics(scale);
-        let layout: Vec<_> = font
-            .layout(header_text, scale, rusttype::point(0.0, v_metrics.ascent))
-            .collect();
-        let layout_h = (v_metrics.ascent - v_metrics.descent).ceil() as u32;
-        let layout_w = {
-            let min_x = layout.first().unwrap().pixel_bounding_box().unwrap().min.x;
-            let max_x = layout.last().unwrap().pixel_bounding_box().unwrap().min.x;
-            (max_x - min_x) as u32
-        };
-        let x_offset = (group_pic_w - layout_w) / 2;
-        let y_offset = (header_h - layout_h) / 2;
-        for glyph in layout {
-            let bounding_box = glyph.pixel_bounding_box().unwrap();
-            glyph.draw(|x, y, v| {
-                group_pic
-                    .get_pixel_mut(
-                        x_offset + x + bounding_box.min.x as u32,
-                        y_offset + y + bounding_box.min.y as u32,
-                    )
-                    .blend(&image::Rgba([240, 240, 240, (v * 255.0) as u8]))
-            })
-        }
-
-        // mask and tile the avatars
-        for (i, avatar_path) in fs::read_dir(avatars_dir).unwrap().enumerate() {
-            let avatar_path = avatar_path.unwrap().path();
-            let mut avatar_img = image::open(&avatar_path).unwrap().into_rgba8();
-            for (x, y, p) in avatar_img.enumerate_pixels_mut() {
-                if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
-                    >= mask_radius * mask_radius
-                {
-                    p.0.copy_from_slice(&DISCORD_COLOR.0);
-                }
-            }
-            let x_offset = i as u32 % num_of_avatars_in_a_row * 128;
-            let y_offset = i as u32 / num_of_avatars_in_a_row * 128 + header_h;
-            // println!(
-            //     "{:#?}: {:?} {:?}",
-            //     avatar_path,
-            //     avatar_img.dimensions(),
-            //     (x_offset, y_offset)
-            // );
-            group_pic
-                .copy_from(&avatar_img, x_offset, y_offset)
-                .unwrap();
-        }
-
-        group_pic.save("example_group_pic.png").unwrap();
+        generate_group_pic("tmp/test_avatars", "example_group_pic.png");
     }
 }
