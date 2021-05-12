@@ -14,10 +14,10 @@ fn new_imagebuffer_with_discord_bg(width: u32, height: u32) -> RgbaImage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{GenericImage, GenericImageView, ImageBuffer, Pixel};
+    use image::{GenericImage, ImageBuffer, Pixel};
     use rand::prelude::*;
     use std::path::Path;
-    use std::{convert::TryInto, fs};
+    use std::fs;
 
     fn generate_random_test_avatars_in_dir_with_size<P>(dir: P, size: u32)
     where
