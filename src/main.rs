@@ -263,6 +263,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                                 match ra.as_ref() {
                                     // for each added reaction to the join message
                                     // add the nickname of the user to the participants message
+                                    // TODO: DM the user that they have joined the session
                                     ReactionAction::Added(r) => {
                                         let nickname = {
                                             let u = r.user(ctx).await?;
@@ -278,6 +279,7 @@ async fn grouppicbegin(ctx: &Context, msg: &Message) -> CommandResult {
                                     }
                                     // for each removed reaction to the join message
                                     // remove the nickname of the user to the participants message
+                                    // TODO: DM the user that they have left the session
                                     ReactionAction::Removed(r) => {
                                         let nickname_to_remove = {
                                             let u = r.user(ctx).await?;
