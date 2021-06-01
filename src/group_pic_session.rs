@@ -48,7 +48,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(recovered_session.join_msg_id, persisted_session.join_msg_id);
-        assert_eq!(recovered_session.participant_id_list, persisted_session.participant_id_list);
+        assert_eq!(
+            recovered_session.participant_id_list,
+            persisted_session.participant_id_list
+        );
         std::fs::remove_dir_all("group_pic").unwrap();
     }
 }
