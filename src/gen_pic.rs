@@ -7,15 +7,21 @@ use image::{GenericImage, ImageBuffer, Pixel, Rgba};
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
 
-pub fn generate_group_pic<I, O>(avatars_dir: I, out_group_pic_path: O)
+pub fn generate_group_pic<I, O, S>(
+    avatars_dir: I,
+    out_group_pic_path: O,
+    num_of_avatars_in_a_row: u32,
+    header_text: S,
+)
 where
     I: AsRef<Path>,
     O: AsRef<Path>,
+    S: AsRef<str>
 {
     // configure the group pic
-    let num_of_avatars_in_a_row = 5_u32;
+    let num_of_avatars_in_a_row = num_of_avatars_in_a_row;
     let header_h = 64;
-    let header_text = "niji3rd-live-day1";
+    let header_text = header_text.as_ref();
     let header_font_size = 54;
     let mask_radius = 64;
     let avatars_dir = avatars_dir.as_ref();
@@ -33,7 +39,8 @@ where
 
     // prepare the image buffer
     let mut group_pic = ImageBuffer::from_pixel(group_pic_w, group_pic_h, DISCORD_COLOR);
-    // println!("{:?}", group_pic.dimensions());
+    #[cfg(debug_assertions)]
+    dbg!(group_pic.dimensions());
 
     // render the header
     let font = rusttype::Font::try_from_bytes(FONT_DATA).expect("error loading font");
@@ -176,7 +183,7 @@ mod tests {
     fn mask_avatar_with_circle() {
         // circle mask color and radius
         let discord_color = image::Rgb([48, 48, 54]);
-        let radius = 64;
+        let radius: u32 = 64;
 
         // avatar image to mask
         let avatar_path = Path::new("avatar.png");
@@ -184,7 +191,7 @@ mod tests {
 
         // mask the avatar cover parts outside circle with
         for (x, y, p) in avatar_img.enumerate_pixels_mut() {
-            if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
+            if (x - 64) * (x - 64) + (y - 64) * (y - 64)
                 >= radius * radius
             {
                 p.0.copy_from_slice(&discord_color.0);
@@ -243,6 +250,11 @@ mod tests {
 
     #[test]
     fn generate_full_group_pic() {
-        generate_group_pic("tmp/test_avatars", "example_group_pic.png");
+        generate_group_pic(
+            "tmp/test_avatars",
+            "example_group_pic.png",
+            5,
+            "niji3rd-live-day1",
+        );
     }
 }
