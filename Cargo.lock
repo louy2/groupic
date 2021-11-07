@@ -1543,8 +1543,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6685ffde3a0bd225bcb0728692e2170784740e7e69fbd861bc9d0101f8e8a566"
+source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
 dependencies = [
  "bitflags",
  "flate2",
@@ -1564,8 +1563,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway-queue"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8b41b001f8375b5bdd753dcb10a9227a857537c3b8abdef8073f3177428ce42"
+source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
 dependencies = [
  "tokio",
  "tracing",
@@ -1575,8 +1573,7 @@ dependencies = [
 [[package]]
 name = "twilight-http"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc170be06f9317f78fedc45af40364b8cf60c2a0e690c43635fbc1fb05cda4ad"
+source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
 dependencies = [
  "brotli",
  "hyper",
@@ -1593,8 +1590,7 @@ dependencies = [
 [[package]]
 name = "twilight-model"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "915354ebd0ebe4068b7b986fde25b21ac6cb4894f6e0e0903563660d41fa8183"
+source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
 dependencies = [
  "bitflags",
  "serde",
@@ -1606,8 +1602,7 @@ dependencies = [
 [[package]]
 name = "twilight-util"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6dbb2151d979abc81e43d4c7747047c4884eef5a8400b43f3bb265dbe5b503ea"
+source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
 dependencies = [
  "twilight-model",
 ]

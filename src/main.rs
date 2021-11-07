@@ -82,28 +82,72 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Event::InteractionCreate(x) => {
                 let x = x.0;
                 match x {
-                    Interaction::ApplicationCommand(x) => {
-                        if x.data.id == ping_command.id.unwrap() {
+                    Interaction::ApplicationCommand(ac) => {
+                        // dispatch to ping
+                        if ac.data.id == ping_command.id.unwrap() {
                             let res = twilight_util::builder::CallbackDataBuilder::new()
                                 .content("Pong".into())
                                 .flags(MessageFlags::EPHEMERAL)
                                 .build();
                             hc.create_interaction_original(
-                                x.id,
-                                &x.token,
+                                ac.id,
+                                &ac.token,
                                 &InteractionResponse::ChannelMessageWithSource(res),
                             )
                             .exec()
                             .await?;
                         }
-                        if x.data.id == avatar_command.id.unwrap() {
+                        // dispatch to avatar
+                        if ac.data.id == avatar_command.id.unwrap() {
+                            let avatar_url: String = match ac.member {
+                                Some(m) => match m.avatar {
+                                    // get guild member avatar if exists
+                                    Some(member_avatar) => {
+                                        if !matches!((&ac.guild_id, &m.user), (Some(_), Some(_))) {
+                                            error!("Gateway event INTERACTION_CREATE should have guild_id and member.user but doesn't");
+                                            String::default()
+                                        } else {
+                                            cdn::get_guild_member_avatar(
+                                                ac.guild_id.unwrap(),
+                                                m.user.unwrap().id,
+                                                member_avatar,
+                                                cdn::PJWG::PNG,
+                                            )
+                                        }
+                                    }
+                                    // get user avatar otherwise
+                                    None => match m.user {
+                                        // get user avatar if exists
+                                        Some(u) => match u.avatar {
+                                            Some(user_avatar) => {
+                                                cdn::get_user_avatar(u.id, user_avatar, cdn::PJWG::PNG)
+                                            },
+                                            None => cdn::get_default_user_avatar(u.discriminator),
+                                        },
+                                        // get default avatar otherwise
+                                        None => {
+                                            error!("Gateway event INTERACTION_CREATE should have member.user but doesn't");
+                                            String::default()
+                                        }
+                                    },
+                                },
+                                None => {
+                                    let u = ac.user.unwrap();
+                                    match u.avatar {
+                                        Some(user_avatar) => {
+                                            cdn::get_user_avatar(u.id, user_avatar, cdn::PJWG::PNG)
+                                        },
+                                        None => cdn::get_default_user_avatar(u.discriminator),
+                                    }
+                                }
+                            };
                             let res = twilight_util::builder::CallbackDataBuilder::new()
-                                .content("Pong".into())
+                                .content(avatar_url)
                                 .flags(MessageFlags::EPHEMERAL)
                                 .build();
                             hc.create_interaction_original(
-                                x.id,
-                                &x.token,
+                                ac.id,
+                                &ac.token,
                                 &InteractionResponse::ChannelMessageWithSource(res),
                             )
                             .exec()
@@ -119,16 +163,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     Ok(())
 }
-
-// /// Reply to command the sender's static avatar
-// #[command]
-// async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
-//     if let Err(why) = msg.reply(ctx, msg.author.static_face()).await {
-//         error!("Error sending message {:?}", why)
-//     }
-
-//     Ok(())
-// }
 
 // /// Show nickname of command sender in a following message, not reply
 // #[command]
