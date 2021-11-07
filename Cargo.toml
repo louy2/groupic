@@ -9,18 +9,13 @@ edition = "2018"
 [dependencies]
 tracing = "0.1"
 tracing-subscriber = "0.3"
-anyhow = "1"
+tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
 image = "0.23"
 rand = "0.8"
 rusttype = "0.9"
-
-[dependencies.serenity]
-version = "0.10"
-features = ["default", "collector"]
-# git = "https://github.com/nickelc/serenity.git"
-# branch = "tokio-1.0/reqwest"
-
-[dependencies.tokio]
-version = "1"
-features = ["full"]
+twilight-model = "0.7"
+twilight-http = { version = "0.7", features = ["tracing"] }
+twilight-gateway = "0.7"
+twilight-util = { version = "0.7", features = ["builder"]}
+lazy_static = "1"

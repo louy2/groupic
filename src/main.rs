@@ -1,119 +1,160 @@
+mod alias;
 mod gen_pic;
 mod util;
 
-use serenity::client::{Client, Context, EventHandler};
-use serenity::framework::standard::{
-    macros::{command, group, hook},
-    CommandResult, CommandError,
-    StandardFramework,
-};
-use serenity::model::channel::Message;
-use serenity::async_trait;
-use tracing::log::{info, error};
+use alias::*;
 use util::*;
 
-#[group]
-#[commands(ping, avatar, nick, react)]
-struct General;
+use std::num::NonZeroU64;
 
-struct Handler;
+use tokio_stream::StreamExt;
+use tracing::{debug, error, info};
+use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
+use twilight_model::application::callback::InteractionResponse;
+use twilight_model::application::interaction::Interaction;
+use twilight_model::channel::message::MessageFlags;
+use twilight_model::id::{ApplicationId, GuildId};
 
-#[async_trait]
-impl EventHandler for Handler {}
+lazy_static::lazy_static! {
+    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(715641223972651169).unwrap());
+    static ref APPLICATION_ID: ApplicationId = ApplicationId(NonZeroU64::new(794225841554325516).unwrap());
+}
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // set up global trace collector
+    #[cfg(debug_assertions)]
     tracing_subscriber::fmt()
         .pretty()
         .with_thread_names(true)
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
+    #[cfg(not(debug_assertions))]
+    tracing_subscriber::fmt()
+        .with_thread_names(true)
         .with_max_level(tracing::Level::INFO)
-        // sets this to be the default, global collector for this application.
         .init();
 
-    let framework = StandardFramework::new()
-        .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
-        .before(log_command_user)
-        .after(after_hook)
-        .group(&GENERAL_GROUP);
-
     // Login with a bot token from the environment
-    let token = std::env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN env var not found, cannot log in");
-    let mut client = Client::builder(token)
-        .event_handler(Handler)
-        .framework(framework)
-        .await
-        .expect("Error creating client");
+    let token = std::env::var("DISCORD_TOKEN").expect("Please set DISCORD_TOKEN");
 
-    // start listening for events by starting a single shard
-    if let Err(why) = client.start().await {
-        println!("An error occurred while running the client: {:?}", why);
-    }
-}
+    let hc = twilight_http::Client::builder()
+        .token(token.clone())
+        .application_id(*APPLICATION_ID)
+        .build();
+    let me = hc.current_user().exec().await?.model().await?;
+    info!("Using Discord API as {}#{}", me.name, me.discriminator());
 
-#[hook]
-#[instrument(level = "debug")]
-async fn log_command_user(_: &Context, msg: &Message, command_name: &str) -> bool {
-    info!(
-        "Got command '{}' by user '{}'",
-        command_name, msg.author.name
-    );
+    let ping_command = hc
+        .create_guild_command(*TEST_GUILD_ID, "ping")?
+        .chat_input("Replies with pong.")?
+        .exec()
+        .await?
+        .model()
+        .await?;
+    let avatar_command = hc
+        .create_guild_command(*TEST_GUILD_ID, "avatar")?
+        .chat_input("Replies with your avatar")?
+        .exec()
+        .await?
+        .model()
+        .await?;
 
-    true
-}
+    let (gc, mut events) = Shard::builder(
+        token.clone(),
+        Intents::GUILD_MESSAGES | Intents::GUILD_MESSAGE_REACTIONS,
+    )
+    .event_types(EventTypeFlags::READY | EventTypeFlags::INTERACTION_CREATE)
+    .build();
 
-#[hook]
-#[instrument(level = "debug")]
-async fn after_hook(_: &Context, _: &Message, command_name: &str, error: Result<(), CommandError>) {
-    if let Err(why) = error {
-        error!("{:?} in {}", why, command_name);
-    }
-}
+    gc.start().await?;
 
-/// Reply to command "Pong!"
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    if let Err(why) = msg.reply(ctx, "Pong!").await {
-        error!("Error sending message {:?}", why)
-    }
-
-    Ok(())
-}
-
-/// Reply to command the sender's static avatar
-#[command]
-async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
-    if let Err(why) = msg.reply(ctx, msg.author.static_face()).await {
-        error!("Error sending message {:?}", why)
-    }
-
-    Ok(())
-}
-
-/// Show nickname of command sender in a following message, not reply
-#[command]
-async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
-    let nick = msg
-        .author_nick(ctx)
-        .await
-        .unwrap_or(msg.author.name.clone());
-    let content = format!("In response to message of {}", nick);
-    if let Err(why) = msg.channel_id.say(ctx, content).await {
-        error!("Error sending message {:?}", why)
-    }
-    Ok(())
-}
-
-/// Reply to command and add a reaction to the reply
-#[command]
-async fn react(ctx: &Context, msg: &Message) -> CommandResult {
-    let content = "See the reaction below".to_string();
-    match msg.reply(ctx, content).await {
-        Ok(m) => {
-            if let Err(why) = m.react(ctx, '📷').await {
-                error!("Error reacting to message {:?}", why)
+    while let Some(event) = events.next().await {
+        match event {
+            Event::Ready(x) => {
+                let me = x.user;
+                info!(
+                    "Connecting to Discord Gateway as {}#{}",
+                    me.name,
+                    me.discriminator()
+                );
             }
+            Event::InteractionCreate(x) => {
+                let x = x.0;
+                match x {
+                    Interaction::ApplicationCommand(x) => {
+                        if x.data.id == ping_command.id.unwrap() {
+                            let res = twilight_util::builder::CallbackDataBuilder::new()
+                                .content("Pong".into())
+                                .flags(MessageFlags::EPHEMERAL)
+                                .build();
+                            hc.create_interaction_original(
+                                x.id,
+                                &x.token,
+                                &InteractionResponse::ChannelMessageWithSource(res),
+                            )
+                            .exec()
+                            .await?;
+                        }
+                        if x.data.id == avatar_command.id.unwrap() {
+                            let res = twilight_util::builder::CallbackDataBuilder::new()
+                                .content("Pong".into())
+                                .flags(MessageFlags::EPHEMERAL)
+                                .build();
+                            hc.create_interaction_original(
+                                x.id,
+                                &x.token,
+                                &InteractionResponse::ChannelMessageWithSource(res),
+                            )
+                            .exec()
+                            .await?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            _ => {}
         }
-        Err(why) => error!("Error sending message {:?}", why),
     }
+
     Ok(())
 }
+
+// /// Reply to command the sender's static avatar
+// #[command]
+// async fn avatar(ctx: &Context, msg: &Message) -> CommandResult {
+//     if let Err(why) = msg.reply(ctx, msg.author.static_face()).await {
+//         error!("Error sending message {:?}", why)
+//     }
+
+//     Ok(())
+// }
+
+// /// Show nickname of command sender in a following message, not reply
+// #[command]
+// async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
+//     let nick = msg
+//         .author_nick(ctx)
+//         .await
+//         .unwrap_or(msg.author.name.clone());
+//     let content = format!("In response to message of {}", nick);
+//     if let Err(why) = msg.channel_id.say(ctx, content).await {
+//         error!("Error sending message {:?}", why)
+//     }
+//     Ok(())
+// }
+
+// /// Reply to command and add a reaction to the reply
+// #[command]
+// async fn react(ctx: &Context, msg: &Message) -> CommandResult {
+//     let content = "See the reaction below".to_string();
+//     match msg.reply(ctx, content).await {
+//         Ok(m) => {
+//             if let Err(why) = m.react(ctx, '📷').await {
+//                 error!("Error reacting to message {:?}", why)
+//             }
+//         }
+//         Err(why) => error!("Error sending message {:?}", why),
+//     }
+//     Ok(())
+// }
