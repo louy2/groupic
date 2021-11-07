@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     Some(member_avatar) => {
                                         if !matches!((&ac.guild_id, &m.user), (Some(_), Some(_))) {
                                             error!("Gateway event INTERACTION_CREATE should have guild_id and member.user but doesn't");
-                                            String::default()
+                                            continue
                                         } else {
                                             cdn::get_guild_member_avatar(
                                                 ac.guild_id.unwrap(),
@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                         // get default avatar otherwise
                                         None => {
                                             error!("Gateway event INTERACTION_CREATE should have member.user but doesn't");
-                                            String::default()
+                                            continue
                                         }
                                     },
                                 },
