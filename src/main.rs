@@ -45,14 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let me = hc.current_user().exec().await?.model().await?;
     info!("Using Discord API as {}#{}", me.name, me.discriminator());
 
-    let ping_command = hc
+    let ping_command: Command = hc
         .create_guild_command(*TEST_GUILD_ID, "ping")?
-        .chat_input("Replies with pong.")?
+        .chat_input("Replies with pong")?
         .exec()
         .await?
         .model()
         .await?;
-    let avatar_command = hc
+    let avatar_command: Command = hc
         .create_guild_command(*TEST_GUILD_ID, "avatar")?
         .chat_input("Replies with your avatar")?
         .exec()
@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     Some(member_avatar) => {
                                         if !matches!((&ac.guild_id, &m.user), (Some(_), Some(_))) {
                                             error!("Gateway event INTERACTION_CREATE should have guild_id and member.user but doesn't");
-                                            continue
+                                            continue;
                                         } else {
                                             cdn::get_guild_member_avatar(
                                                 ac.guild_id.unwrap(),
@@ -119,15 +119,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     None => match m.user {
                                         // get user avatar if exists
                                         Some(u) => match u.avatar {
-                                            Some(user_avatar) => {
-                                                cdn::get_user_avatar(u.id, user_avatar, cdn::PJWG::PNG)
-                                            },
+                                            Some(user_avatar) => cdn::get_user_avatar(
+                                                u.id,
+                                                user_avatar,
+                                                cdn::PJWG::PNG,
+                                            ),
                                             None => cdn::get_default_user_avatar(u.discriminator),
                                         },
                                         // get default avatar otherwise
                                         None => {
                                             error!("Gateway event INTERACTION_CREATE should have member.user but doesn't");
-                                            continue
+                                            continue;
                                         }
                                     },
                                 },
@@ -136,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                     match u.avatar {
                                         Some(user_avatar) => {
                                             cdn::get_user_avatar(u.id, user_avatar, cdn::PJWG::PNG)
-                                        },
+                                        }
                                         None => cdn::get_default_user_avatar(u.discriminator),
                                     }
                                 }
