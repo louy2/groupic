@@ -1,3 +1,19 @@
+#[macro_export]
+macro_rules! dbg_debug {
+    ($var:expr) => {{
+        tracing::debug!(concat!(stringify!($var), " = {:?}"), $var);
+        $var
+    }};
+}
+
+#[macro_export]
+macro_rules! dbg_trace {
+    ($var:expr) => {{
+        tracing::trace!(concat!(stringify!($var), " = {:?}"), $var);
+        $var
+    }};
+}
+
 pub mod cdn {
     use twilight_model::id::{GuildId, UserId};
 
@@ -27,7 +43,7 @@ pub mod cdn {
         };
     }
 
-    /// Get path to default user avatar by user discriminator 
+    /// Get path to default user avatar by user discriminator
     macro_rules! default_user_avatar {
         ($user_discriminator:expr) => {
             format!("embed/avatars/{}.png", $user_discriminator % 5)
@@ -44,7 +60,10 @@ pub mod cdn {
     /// Get path to guild member avatar by guild id, user id, member avatar hash, and image format
     macro_rules! guild_member_avatar {
         ($guild_id:expr, $user_id:expr, $member_avatar:expr, $format:expr) => {
-            format!("guilds/{}/users/{}/avatars/{}.{}", $guild_id, $user_id, $member_avatar, $format)
+            format!(
+                "guilds/{}/users/{}/avatars/{}.{}",
+                $guild_id, $user_id, $member_avatar, $format
+            )
         };
     }
 
@@ -56,12 +75,27 @@ pub mod cdn {
     where
         S: AsRef<str>,
     {
-        base!(user_avatar!(user_id.0, user_avatar.as_ref(), format.as_ref()))
+        base!(user_avatar!(
+            user_id.0,
+            user_avatar.as_ref(),
+            format.as_ref()
+        ))
     }
 
-    pub fn get_guild_member_avatar<S>(guild_id: GuildId, user_id: UserId, member_avatar: S, format: PJWG) -> String 
-    where S: AsRef<str>
+    pub fn get_guild_member_avatar<S>(
+        guild_id: GuildId,
+        user_id: UserId,
+        member_avatar: S,
+        format: PJWG,
+    ) -> String
+    where
+        S: AsRef<str>,
     {
-        base!(guild_member_avatar!(guild_id.0, user_id.0, member_avatar.as_ref(), format.as_ref()))
+        base!(guild_member_avatar!(
+            guild_id.0,
+            user_id.0,
+            member_avatar.as_ref(),
+            format.as_ref()
+        ))
     }
 }

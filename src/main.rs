@@ -2,17 +2,29 @@ mod alias;
 mod gen_pic;
 mod util;
 
+use anyhow::Context;
+use futures::future::try_join_all;
+use std::num::NonZeroU64;
+use std::str::FromStr;
+use tempdir::TempDir;
+use tokio::fs;
+use tokio::io::AsyncWriteExt;
+use tokio::task::spawn_blocking;
+use tokio_stream::StreamExt;
+use tracing::{error, info};
+
 use alias::*;
 use util::*;
 
-use std::num::NonZeroU64;
-
-use tokio_stream::StreamExt;
-use tracing::{debug, error, info};
+use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::application::callback::InteractionResponse;
+use twilight_model::application::command::{ChannelCommandOptionData, Command, CommandOption};
+use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::MessageFlags;
+use twilight_model::channel::{Channel, ChannelType, GuildChannel};
+use twilight_model::guild::Member;
 use twilight_model::id::{ApplicationId, GuildId};
 
 lazy_static::lazy_static! {
@@ -59,17 +71,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await?
         .model()
         .await?;
+    let groupic_command: Command = hc
+        .create_guild_command(*TEST_GUILD_ID, "groupic")?
+        .chat_input("Replies with a group picture of the given voice channel")?
+        .command_options(&[CommandOption::Channel(ChannelCommandOptionData {
+            channel_types: vec![ChannelType::GuildVoice],
+            description: "The voice channel for group picture".into(),
+            name: "channel".into(),
+            required: true,
+        })])?
+        .exec()
+        .await?
+        .model()
+        .await?;
 
     let (gc, mut events) = Shard::builder(
         token.clone(),
-        Intents::GUILD_MESSAGES | Intents::GUILD_MESSAGE_REACTIONS,
+        Intents::GUILDS
+            | Intents::GUILD_MESSAGES
+            | Intents::GUILD_MESSAGE_REACTIONS
+            | Intents::GUILD_VOICE_STATES,
     )
-    .event_types(EventTypeFlags::READY | EventTypeFlags::INTERACTION_CREATE)
+    .event_types(
+        EventTypeFlags::GUILDS
+            | EventTypeFlags::INTERACTION_CREATE
+            | EventTypeFlags::GUILD_VOICE_STATES
+            | EventTypeFlags::VOICE_STATE_UPDATE,
+    )
     .build();
-
     gc.start().await?;
 
+    let cache = InMemoryCache::builder()
+        .resource_types(ResourceType::GUILD | ResourceType::VOICE_STATE)
+        .build();
+
     while let Some(event) = events.next().await {
+        cache.update(&event);
         match event {
             Event::Ready(x) => {
                 let me = x.user;
@@ -154,6 +191,163 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             )
                             .exec()
                             .await?;
+                        }
+                        // dispatch to groupic
+                        if ac.data.id == groupic_command.id.unwrap() {
+                            let cov = ac
+                                .data
+                                .options
+                                .into_iter()
+                                .find(|cdo| cdo.name == "channel")
+                                .unwrap()
+                                .value;
+                            let ci = match cov {
+                                CommandOptionValue::Channel(ci) => ci,
+                                _ => {
+                                    error!(
+                                        "Should get guild voice channel but instead got {:?}",
+                                        cov
+                                    );
+                                    continue;
+                                }
+                            };
+                            dbg_trace!(&ci);
+                            let gi = match ac.guild_id {
+                                Some(gi) => gi,
+                                None => {
+                                    error!("Command cannot be used outside of a guild");
+                                    continue;
+                                }
+                            };
+                            let c = hc.channel(ci).exec().await?.model().await?;
+                            let gc = match c {
+                                Channel::Guild(gc) => gc,
+                                _ => {
+                                    error!(
+                                        "Should get guild voice channel but instead got {:?}",
+                                        c
+                                    );
+                                    continue;
+                                }
+                            };
+                            let vc = match gc {
+                                GuildChannel::Voice(vc) => vc,
+                                _ => {
+                                    error!(
+                                        "Should get guild voice channel but instead got {:?}",
+                                        gc
+                                    );
+                                    continue;
+                                }
+                            };
+
+                            dbg_trace!(&gi);
+                            let voice_states = match cache.voice_channel_states(ci) {
+                                Some(vcss) => vcss,
+                                None => {
+                                    error!("Failed to get voice states for channel {}", vc.name);
+                                    continue;
+                                }
+                            };
+                            let mut v_m: Vec<_> = Vec::with_capacity(1 << 5); // 128
+                            for vs in voice_states.inspect(|vs| {
+                                dbg_trace!(vs.user_id);
+                            }) {
+                                if vs.channel_id.unwrap() == ci {
+                                    match vs.member.clone() {
+                                        Some(m) => {
+                                            v_m.push(m);
+                                        }
+                                        None => {
+                                            let m: Member = hc
+                                                .guild_member(gi, vs.user_id)
+                                                .exec()
+                                                .await?
+                                                .model()
+                                                .await?;
+                                            v_m.push(m);
+                                        }
+                                    }
+                                }
+                            }
+                            dbg_trace!(&v_m);
+                            let v_a: Vec<_> = v_m
+                                .iter()
+                                .map(|m| match m.avatar.as_ref() {
+                                    Some(s) => cdn::get_guild_member_avatar(
+                                        gi,
+                                        m.user.id,
+                                        s,
+                                        cdn::PJWG::PNG,
+                                    ),
+                                    None => match m.user.avatar.as_ref() {
+                                        Some(s) => {
+                                            cdn::get_user_avatar(m.user.id, s, cdn::PJWG::PNG)
+                                        }
+                                        None => cdn::get_default_user_avatar(m.user.discriminator),
+                                    },
+                                })
+                                .collect();
+
+                            // download avatars to this temp dir
+                            let avatars_dir = TempDir::new("avatars").unwrap();
+                            // construct async download tasks for each image file
+                            let rc = reqwest::Client::default();
+                            let download_futs: Vec<_> = v_a
+                                .into_iter()
+                                .map(|url| async {
+                                    let mut file = {
+                                        let url = reqwest::Url::from_str(&url).unwrap();
+                                        let fname = url.path_segments().unwrap().last().unwrap();
+                                        fs::File::create(avatars_dir.path().join(fname))
+                                            .await
+                                            .unwrap()
+                                    };
+                                    let res = rc.get(url).send().await.unwrap();
+                                    let img = res.bytes().await.unwrap();
+                                    file.write_all(img.as_ref()).await
+                                })
+                                .collect();
+                            // run downloads concurrently
+                            try_join_all(download_futs).await?;
+
+                            let groupic_path = avatars_dir.path().join("groupic.png");
+
+                            let ad_clone = avatars_dir.path().to_owned();
+                            let vn_clone = vc.name.clone();
+                            let gp_clone = groupic_path.clone();
+                            dbg_debug!(&avatars_dir.path().is_dir());
+                            spawn_blocking(|| {
+                                gen_pic::generate_group_pic(ad_clone, gp_clone, 5, vn_clone);
+                            })
+                            .await?;
+                            dbg_debug!(&groupic_path.is_file());
+
+                            let content = vc.name
+                                + "\n"
+                                + &v_m
+                                    .into_iter()
+                                    .map(|m| m.nick.unwrap_or(m.user.name))
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                            let cbd = twilight_util::builder::CallbackDataBuilder::new()
+                                .content(content)
+                                // .flags(MessageFlags::EPHEMERAL)
+                                .build();
+                            hc.create_interaction_original(
+                                ac.id,
+                                &ac.token,
+                                &InteractionResponse::ChannelMessageWithSource(cbd),
+                            )
+                            .exec()
+                            .await?;
+                            let groupic_bytes = fs::read(groupic_path)
+                                .await
+                                .with_context(|| "Failed to read groupic.png")?;
+                            hc.update_interaction_original(&ac.token)?
+                                .files(&[("groupic.png", &groupic_bytes)])
+                                .exec()
+                                .await?;
                         }
                     }
                     _ => {}

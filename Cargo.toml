@@ -16,6 +16,10 @@ image = "0.23"
 rand = "0.8"
 rusttype = "0.9"
 lazy_static = "1"
+anyhow = "1"
+tempdir = "0.3"
+reqwest = "0.11"
+futures = "0.3"
 # twilight-model = "0.7"
 # twilight-http = { version = "0.7", features = ["tracing"] }
 # twilight-gateway = "0.7"
@@ -24,3 +28,4 @@ twilight-model = { git = "https://github.com/7596ff/twilight.git", branch = "fea
 twilight-http = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars", features = ["tracing"] }
 twilight-gateway = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars" }
 twilight-util = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars", features = ["builder"]}
+twilight-cache-inmemory = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars"}
