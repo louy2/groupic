@@ -3,6 +3,7 @@
 use std::{fs, path::Path};
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba};
+use tracing::{error, warn};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
@@ -58,7 +59,13 @@ where
     let x_offset = (group_pic_w - layout_w) / 2;
     let y_offset = (header_h - layout_h) / 2;
     for glyph in layout {
-        let bounding_box = glyph.pixel_bounding_box().unwrap();
+        let bounding_box = match glyph.pixel_bounding_box() {
+            Some(b) => b,
+            None => {
+                warn!("Ignoring glyph without bounding box: rusttype doesn't support emoji yet.");
+                continue;
+            }
+        };
         glyph.draw(|x, y, v| {
             group_pic
                 .get_pixel_mut(
