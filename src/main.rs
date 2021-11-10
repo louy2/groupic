@@ -28,7 +28,7 @@ use twilight_model::guild::Member;
 use twilight_model::id::{ApplicationId, GuildId};
 
 lazy_static::lazy_static! {
-    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(715641223972651169).unwrap());
+    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(137463604311097345).unwrap());
     static ref APPLICATION_ID: ApplicationId = ApplicationId(NonZeroU64::new(794225841554325516).unwrap());
 }
 
@@ -323,13 +323,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             .await?;
                             dbg_debug!(&groupic_path.is_file());
 
-                            let content = vc.name
-                                + "\n"
-                                + &v_m
-                                    .into_iter()
-                                    .map(|m| m.nick.unwrap_or(m.user.name))
-                                    .collect::<Vec<_>>()
-                                    .join("\n");
+                            // let content = vc.name
+                            //     + "\n"
+                            //     + &v_m
+                            //         .into_iter()
+                            //         .map(|m| m.nick.unwrap_or(m.user.name))
+                            //         .collect::<Vec<_>>()
+                            //         .join("\n");
+                            let content = "Oats curry everyone!".to_owned();
                             let cbd = twilight_util::builder::CallbackDataBuilder::new()
                                 .content(content)
                                 // .flags(MessageFlags::EPHEMERAL)
@@ -360,31 +361,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     Ok(())
 }
 
-// /// Show nickname of command sender in a following message, not reply
-// #[command]
-// async fn nick(ctx: &Context, msg: &Message) -> CommandResult {
-//     let nick = msg
-//         .author_nick(ctx)
-//         .await
-//         .unwrap_or(msg.author.name.clone());
-//     let content = format!("In response to message of {}", nick);
-//     if let Err(why) = msg.channel_id.say(ctx, content).await {
-//         error!("Error sending message {:?}", why)
-//     }
-//     Ok(())
-// }
-
-// /// Reply to command and add a reaction to the reply
-// #[command]
-// async fn react(ctx: &Context, msg: &Message) -> CommandResult {
-//     let content = "See the reaction below".to_string();
-//     match msg.reply(ctx, content).await {
-//         Ok(m) => {
-//             if let Err(why) = m.react(ctx, '📷').await {
-//                 error!("Error reacting to message {:?}", why)
-//             }
-//         }
-//         Err(why) => error!("Error sending message {:?}", why),
-//     }
-//     Ok(())
-// }
