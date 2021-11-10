@@ -6,9 +6,9 @@ Inspired by the Love Live! Discord community.
 
 ## Use of Discord API
 
-The intent identity is necessary for accessing user avatars.
+Using the latest application command API.
 
-The permission Send Message is necessary for sending the resulting picture to a channel.
+Intent GUILDS and GUILD_VOICE_STATES are needed to retrieve members of a voice channel.
 
 ## Details about how to generate the group picture
 
@@ -24,8 +24,8 @@ The header is 64px tall.
 
 Commands made for familiarizing with the API and debugging.
 
-- `~ping`: reply to the command message with "Pong!"
-- `~avatar`: reply to the command message with URL to the static avatar icon of the sender
+- `/ping`: reply to the command message with "Pong!"
+- `/avatar`: reply to the command message with URL to the static avatar icon of the sender
 
 ## Other Learnings
 
@@ -34,5 +34,5 @@ Commands made for familiarizing with the API and debugging.
 ## References
 
 * Structured multi-threaded logging: [tracing](https://docs.rs/tracing/0.1.25/tracing/index.htm)
-* Discord API: [serenity](https://docs.rs/serenity/0.10.4/serenity/index.html)
+* Discord API: [twilight](https://twilight.rs)
 * What is the best image downscaling algorithm (quality-wise)?: [StackOverflow](https://stackoverflow.com/a/6171860)
