@@ -30,7 +30,6 @@ use twilight_model::id::{ApplicationId, GuildId};
 use twilight_util::builder::command::CommandBuilder;
 
 lazy_static::lazy_static! {
-    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(715641223972651169).unwrap());
     static ref APPLICATION_ID: ApplicationId = ApplicationId(NonZeroU64::new(794225841554325516).unwrap());
 }
 
@@ -60,8 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("Using Discord API as {}#{}", me.name, me.discriminator());
 
     let commands = hc
-        .set_guild_commands(
-            *TEST_GUILD_ID,
+        .set_global_commands(
             &[
                 CommandBuilder::new(
                     "ping".into(),
@@ -95,8 +93,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .await?;
 
     let ping_command: &Command = commands.get(0).unwrap();
+    info!("Command /ping registered with id {}", ping_command.id.unwrap());
     let avatar_command: &Command = commands.get(1).unwrap();
+    info!("Command /avatar registered with id {}", avatar_command.id.unwrap());
     let groupic_command: &Command = commands.get(2).unwrap();
+    info!("Command /groupic registered with id {}", groupic_command.id.unwrap());
 
     let (gc, mut events) = Shard::builder(
         token.clone(),

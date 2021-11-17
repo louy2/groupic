@@ -1,3 +1,6 @@
+use twilight_http::Client;
+use twilight_model::id::GuildId;
+
 #[macro_export]
 macro_rules! dbg_debug {
     ($var:expr) => {{
@@ -12,6 +15,18 @@ macro_rules! dbg_trace {
         tracing::trace!(concat!(stringify!($var), " = {:?}"), $var);
         $var
     }};
+}
+
+pub async fn delete_guild_commands(client: &Client, guild_id: GuildId) -> anyhow::Result<()> {
+    let guild_commands = client
+        .get_guild_commands(guild_id)?
+        .exec().await?.models().await?;
+    for c in guild_commands {
+        if let Some(command_id) = c.id {
+            client.delete_guild_command(guild_id, command_id)?.exec().await?;
+        }
+    }
+    Ok(())
 }
 
 pub mod cdn {
