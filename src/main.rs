@@ -5,7 +5,6 @@ mod util;
 use anyhow::Context;
 use futures::future::try_join_all;
 use hyper::body::HttpBody;
-use std::num::NonZeroU64;
 use tempdir::TempDir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
@@ -19,18 +18,16 @@ use util::*;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::application::callback::InteractionResponse;
-use twilight_model::application::command::{ChannelCommandOptionData, Command, CommandOption, CommandType};
+use twilight_model::application::command::{
+    ChannelCommandOptionData, Command, CommandOption, CommandType,
+};
 use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::{Channel, ChannelType, GuildChannel};
 use twilight_model::guild::Member;
-use twilight_model::id::{ApplicationId, GuildId};
+use twilight_model::id::ApplicationId;
 use twilight_util::builder::command::CommandBuilder;
-
-lazy_static::lazy_static! {
-    static ref APPLICATION_ID: ApplicationId = ApplicationId(NonZeroU64::new(794225841554325516).unwrap());
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -48,55 +45,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .init();
 
     // Login with a bot token from the environment
-    let token = std::env::var("DISCORD_TOKEN").expect("Please set DISCORD_TOKEN");
+    let token = std::env::var("DISCORD_BOT_TOKEN").expect("Please set DISCORD_BOT_TOKEN");
+
+    let application_id = std::env::var("DISCORD_APP_ID").expect("Please set DISCORD_APP_ID");
+    let application_id = u64::from_str_radix(&application_id, 10)?;
+    let application_id = ApplicationId::new(application_id)
+        .ok_or(anyhow::anyhow!("Invalid application id in DISCORD_APP_ID"))?;
 
     let hc = twilight_http::Client::builder()
         .token(token.clone())
-        .application_id(*APPLICATION_ID)
+        .application_id(application_id)
         .build();
     let me = hc.current_user().exec().await?.model().await?;
     info!("Using Discord API as {}#{}", me.name, me.discriminator());
 
     let commands = hc
-        .set_global_commands(
-            &[
-                CommandBuilder::new(
-                    "ping".into(),
-                    "Replies with pong".into(),
-                    CommandType::ChatInput,
-                )
-                .build(),
-                CommandBuilder::new(
-                    "avatar".into(),
-                    "Replies with your avatar".into(),
-                    CommandType::ChatInput,
-                )
-                .build(),
-                CommandBuilder::new(
-                    "groupic".into(),
-                    "Replies with a group picture of the given voice channel".into(),
-                    CommandType::ChatInput,
-                )
-                .option(CommandOption::Channel(ChannelCommandOptionData {
-                    channel_types: vec![ChannelType::GuildVoice],
-                    description: "The voice channel for group picture".into(),
-                    name: "channel".into(),
-                    required: true,
-                }))
-                .build(),
-            ],
-        )?
+        .set_global_commands(&[
+            CommandBuilder::new(
+                "ping".into(),
+                "Replies with pong".into(),
+                CommandType::ChatInput,
+            )
+            .build(),
+            CommandBuilder::new(
+                "avatar".into(),
+                "Replies with your avatar".into(),
+                CommandType::ChatInput,
+            )
+            .build(),
+            CommandBuilder::new(
+                "groupic".into(),
+                "Replies with a group picture of the given voice channel".into(),
+                CommandType::ChatInput,
+            )
+            .option(CommandOption::Channel(ChannelCommandOptionData {
+                channel_types: vec![ChannelType::GuildVoice],
+                description: "The voice channel for group picture".into(),
+                name: "channel".into(),
+                required: true,
+            }))
+            .build(),
+        ])?
         .exec()
         .await?
         .models()
         .await?;
 
     let ping_command: &Command = commands.get(0).unwrap();
-    info!("Command /ping registered with id {}", ping_command.id.unwrap());
+    info!(
+        "Command /ping registered with id {}",
+        ping_command.id.unwrap()
+    );
     let avatar_command: &Command = commands.get(1).unwrap();
-    info!("Command /avatar registered with id {}", avatar_command.id.unwrap());
+    info!(
+        "Command /avatar registered with id {}",
+        avatar_command.id.unwrap()
+    );
     let groupic_command: &Command = commands.get(2).unwrap();
-    info!("Command /groupic registered with id {}", groupic_command.id.unwrap());
+    info!(
+        "Command /groupic registered with id {}",
+        groupic_command.id.unwrap()
+    );
 
     let (gc, mut events) = Shard::builder(
         token.clone(),

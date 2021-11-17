@@ -1,0 +1,14 @@
+[Unit]
+Description=Groupic
+After=network-online.target
+
+[Service]
+ExecStart=/home/ec2-user/groupic/target/release/groupic
+Environment=DISCORD_BOT_TOKEN=
+Environment=DISCORD_APP_ID=
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+
