@@ -1835,7 +1835,7 @@ dependencies = [
 [[package]]
 name = "twilight-cache-inmemory"
 version = "0.7.1"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "bitflags",
  "dashmap",
@@ -1846,7 +1846,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway"
 version = "0.7.1"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "bitflags",
  "flate2",
@@ -1866,7 +1866,7 @@ dependencies = [
 [[package]]
 name = "twilight-gateway-queue"
 version = "0.7.0"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "tokio",
  "tracing",
@@ -1876,7 +1876,7 @@ dependencies = [
 [[package]]
 name = "twilight-http"
 version = "0.7.1"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "brotli",
  "hyper",
@@ -1893,7 +1893,7 @@ dependencies = [
 [[package]]
 name = "twilight-model"
 version = "0.7.1"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "bitflags",
  "serde",
@@ -1905,7 +1905,7 @@ dependencies = [
 [[package]]
 name = "twilight-util"
 version = "0.7.0"
-source = "git+https://github.com/7596ff/twilight.git?branch=feat/model/guild-avatars#79e0813989a2ae176d76bcdb870d3bfabc760361"
+source = "git+https://github.com/twilight-rs/twilight#48a74e113fb252d23739bef44cc5a05b80ff2599"
 dependencies = [
  "twilight-model",
 ]

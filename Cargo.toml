@@ -24,8 +24,8 @@ futures = "0.3"
 # twilight-http = { version = "0.7", features = ["tracing"] }
 # twilight-gateway = "0.7"
 # twilight-util = { version = "0.7", features = ["builder"]}
-twilight-model = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars" }
-twilight-http = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars", features = ["tracing"] }
-twilight-gateway = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars" }
-twilight-util = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars", features = ["builder"]}
-twilight-cache-inmemory = { git = "https://github.com/7596ff/twilight.git", branch = "feat/model/guild-avatars"}
+twilight-model = { git = "https://github.com/twilight-rs/twilight" }
+twilight-http = { git = "https://github.com/twilight-rs/twilight", features = ["tracing"] }
+twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
+twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["builder"]}
+twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }

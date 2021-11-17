@@ -40,7 +40,7 @@ where
 
     // prepare the image buffer
     let mut group_pic = ImageBuffer::from_pixel(group_pic_w, group_pic_h, DISCORD_COLOR);
-    #[cfg(debug_assertions)]
+    // #[cfg(debug_assertions)]
     // dbg!(group_pic.dimensions());
 
     // render the header
