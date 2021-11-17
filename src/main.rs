@@ -6,7 +6,6 @@ use anyhow::Context;
 use futures::future::try_join_all;
 use hyper::body::HttpBody;
 use std::num::NonZeroU64;
-use std::str::FromStr;
 use tempdir::TempDir;
 use tokio::fs;
 use tokio::io::AsyncWriteExt;

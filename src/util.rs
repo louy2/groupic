@@ -17,6 +17,7 @@ macro_rules! dbg_trace {
     }};
 }
 
+#[allow(dead_code)]
 pub async fn delete_guild_commands(client: &Client, guild_id: GuildId) -> anyhow::Result<()> {
     let guild_commands = client
         .get_guild_commands(guild_id)?
@@ -32,6 +33,7 @@ pub async fn delete_guild_commands(client: &Client, guild_id: GuildId) -> anyhow
 pub mod cdn {
     use twilight_model::id::{GuildId, UserId};
 
+    #[allow(dead_code)]
     pub enum PJWG {
         PNG,
         JPEG,
