@@ -3,6 +3,7 @@
 use std::{fs, path::Path};
 
 use image::{GenericImage, ImageBuffer, Pixel, Rgba, imageops::resize};
+use num::Integer;
 use tracing::{error, warn};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
@@ -29,12 +30,7 @@ where
 
     // calculate the rest of the configuration
     let num_of_avatars = fs::read_dir(avatars_dir).unwrap().count() as u32;
-    let num_of_rows = num_of_avatars / num_of_avatars_in_a_row
-        + if num_of_avatars % num_of_avatars_in_a_row == 0 {
-            0
-        } else {
-            1
-        };
+    let num_of_rows = num_of_avatars.div_ceil(&num_of_avatars_in_a_row);
     let group_pic_w = 128 * num_of_avatars_in_a_row;
     let group_pic_h = header_h + 128 * num_of_rows;
 
