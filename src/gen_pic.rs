@@ -2,7 +2,7 @@
 
 use std::{fs, path::Path};
 
-use image::{GenericImage, ImageBuffer, Pixel, Rgba};
+use image::{GenericImage, ImageBuffer, Pixel, Rgba, imageops::resize};
 use tracing::{error, warn};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
@@ -80,6 +80,9 @@ where
     for (i, avatar_path) in fs::read_dir(avatars_dir).unwrap().enumerate() {
         let avatar_path = avatar_path.unwrap().path();
         let mut avatar_img = image::open(&avatar_path).unwrap().into_rgba8();
+        if avatar_img.dimensions() != (128, 128) {
+            avatar_img = resize(&avatar_img, 128, 128, image::imageops::FilterType::Lanczos3);
+        }
         for (x, y, p) in avatar_img.enumerate_pixels_mut() {
             if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
                 >= mask_radius * mask_radius
