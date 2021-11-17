@@ -20,13 +20,14 @@ use util::*;
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::application::callback::InteractionResponse;
-use twilight_model::application::command::{ChannelCommandOptionData, Command, CommandOption};
+use twilight_model::application::command::{ChannelCommandOptionData, Command, CommandOption, CommandType};
 use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::{Channel, ChannelType, GuildChannel};
 use twilight_model::guild::Member;
 use twilight_model::id::{ApplicationId, GuildId};
+use twilight_util::builder::command::CommandBuilder;
 
 lazy_static::lazy_static! {
     static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(715641223972651169).unwrap());
@@ -58,33 +59,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let me = hc.current_user().exec().await?.model().await?;
     info!("Using Discord API as {}#{}", me.name, me.discriminator());
 
-    let ping_command: Command = hc
-        .create_guild_command(*TEST_GUILD_ID, "ping")?
-        .chat_input("Replies with pong")?
+    let commands = hc
+        .set_guild_commands(
+            *TEST_GUILD_ID,
+            &[
+                CommandBuilder::new(
+                    "ping".into(),
+                    "Replies with pong".into(),
+                    CommandType::ChatInput,
+                )
+                .build(),
+                CommandBuilder::new(
+                    "avatar".into(),
+                    "Replies with your avatar".into(),
+                    CommandType::ChatInput,
+                )
+                .build(),
+                CommandBuilder::new(
+                    "groupic".into(),
+                    "Replies with a group picture of the given voice channel".into(),
+                    CommandType::ChatInput,
+                )
+                .option(CommandOption::Channel(ChannelCommandOptionData {
+                    channel_types: vec![ChannelType::GuildVoice],
+                    description: "The voice channel for group picture".into(),
+                    name: "channel".into(),
+                    required: true,
+                }))
+                .build(),
+            ],
+        )?
         .exec()
         .await?
-        .model()
+        .models()
         .await?;
-    let avatar_command: Command = hc
-        .create_guild_command(*TEST_GUILD_ID, "avatar")?
-        .chat_input("Replies with your avatar")?
-        .exec()
-        .await?
-        .model()
-        .await?;
-    let groupic_command: Command = hc
-        .create_guild_command(*TEST_GUILD_ID, "groupic")?
-        .chat_input("Replies with a group picture of the given voice channel")?
-        .command_options(&[CommandOption::Channel(ChannelCommandOptionData {
-            channel_types: vec![ChannelType::GuildVoice],
-            description: "The voice channel for group picture".into(),
-            name: "channel".into(),
-            required: true,
-        })])?
-        .exec()
-        .await?
-        .model()
-        .await?;
+
+    let ping_command: &Command = commands.get(0).unwrap();
+    let avatar_command: &Command = commands.get(1).unwrap();
+    let groupic_command: &Command = commands.get(2).unwrap();
 
     let (gc, mut events) = Shard::builder(
         token.clone(),
