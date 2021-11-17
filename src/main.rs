@@ -4,6 +4,7 @@ mod util;
 
 use anyhow::Context;
 use futures::future::try_join_all;
+use hyper::body::HttpBody;
 use std::num::NonZeroU64;
 use std::str::FromStr;
 use tempdir::TempDir;
@@ -28,7 +29,7 @@ use twilight_model::guild::Member;
 use twilight_model::id::{ApplicationId, GuildId};
 
 lazy_static::lazy_static! {
-    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(137463604311097345).unwrap());
+    static ref TEST_GUILD_ID: GuildId = GuildId(NonZeroU64::new(715641223972651169).unwrap());
     static ref APPLICATION_ID: ApplicationId = ApplicationId(NonZeroU64::new(794225841554325516).unwrap());
 }
 
@@ -291,21 +292,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                             // download avatars to this temp dir
                             let avatars_dir = TempDir::new("avatars").unwrap();
+                            let avatars_dir_path = avatars_dir.path().to_owned();
                             // construct async download tasks for each image file
-                            let rc = reqwest::Client::default();
+                            let https = hyper_rustls::HttpsConnector::with_native_roots();
+                            let rc: hyper::Client<_, hyper::Body> =
+                                hyper::Client::builder().build(https);
                             let download_futs: Vec<_> = v_a
                                 .into_iter()
-                                .map(|url| async {
-                                    let mut file = {
-                                        let url = reqwest::Url::from_str(&url).unwrap();
-                                        let fname = url.path_segments().unwrap().last().unwrap();
-                                        fs::File::create(avatars_dir.path().join(fname))
-                                            .await
-                                            .unwrap()
-                                    };
-                                    let res = rc.get(url).send().await.unwrap();
-                                    let img = res.bytes().await.unwrap();
-                                    file.write_all(img.as_ref()).await
+                                .map(move |url| {
+                                    let avatars_dir_path = avatars_dir_path.clone();
+                                    let rc = rc.clone();
+                                    async move {
+                                        let uri: hyper::Uri = url.parse().unwrap();
+                                        let mut file = {
+                                            let fname = std::path::Path::new(uri.path())
+                                                .file_name()
+                                                .unwrap();
+                                            fs::File::create(avatars_dir_path.join(fname))
+                                                .await
+                                                .unwrap()
+                                        };
+                                        let mut res = rc.get(uri).await?;
+                                        while let Some(chunk) = res.body_mut().data().await {
+                                            file.write_all(&chunk?).await?;
+                                        }
+                                        Result::<_, anyhow::Error>::Ok(())
+                                    }
                                 })
                                 .collect();
                             // run downloads concurrently
@@ -360,4 +372,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     Ok(())
 }
-
