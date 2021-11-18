@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{fs, io::Cursor, path::Path};
+use std::{fs, path::Path};
 
 use glyph_brush_layout::{
     ab_glyph::{Font, FontRef, PxScale, ScaleFont},
@@ -8,7 +8,6 @@ use glyph_brush_layout::{
 };
 use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba};
 use num::Integer;
-use tracing::{error, warn};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansJP-Medium.otf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
