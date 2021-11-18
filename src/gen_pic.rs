@@ -1,12 +1,16 @@
 #![allow(dead_code)]
 
-use std::{fs, path::Path};
+use std::{fs, io::Cursor, path::Path};
 
-use image::{GenericImage, ImageBuffer, Pixel, Rgba, imageops::resize};
+use glyph_brush_layout::{
+    ab_glyph::{Font, FontRef, PxScale, ScaleFont},
+    FontId, GlyphPositioner, Layout, SectionGeometry, SectionGlyph, SectionText,
+};
+use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba};
 use num::Integer;
 use tracing::{error, warn};
 
-const FONT_DATA: &[u8] = include_bytes!("../NotoSansDisplay-SemiBold.ttf");
+const FONT_DATA: &[u8] = include_bytes!("../NotoSansJP-Medium.otf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
 
 pub fn generate_group_pic<I, O, S>(
@@ -14,11 +18,10 @@ pub fn generate_group_pic<I, O, S>(
     out_group_pic_path: O,
     num_of_avatars_in_a_row: u32,
     header_text: S,
-)
-where
+) where
     I: AsRef<Path>,
     O: AsRef<Path>,
-    S: AsRef<str>
+    S: AsRef<str>,
 {
     // configure the group pic
     let num_of_avatars_in_a_row = num_of_avatars_in_a_row;
@@ -40,36 +43,61 @@ where
     // dbg!(group_pic.dimensions());
 
     // render the header
-    let font = rusttype::Font::try_from_bytes(FONT_DATA).expect("error loading font");
-    let scale = rusttype::Scale::uniform(header_font_size as f32);
-    let v_metrics = font.v_metrics(scale);
-    let layout: Vec<_> = font
-        .layout(header_text, scale, rusttype::point(0.0, v_metrics.ascent))
-        .collect();
-    let layout_h = (v_metrics.ascent - v_metrics.descent).ceil() as u32;
+    let noto = FontRef::try_from_slice(FONT_DATA).expect("error loading font");
+    let fonts = &[noto.clone()];
+    let glyphs = Layout::default().calculate_glyphs(
+        fonts,
+        &SectionGeometry {
+            screen_position: (0., 0.),
+            bounds: (group_pic_w as f32, header_h as f32),
+        },
+        &[SectionText {
+            text: header_text,
+            scale: PxScale::from(header_font_size as f32),
+            font_id: FontId(0),
+        }],
+    );
+    let scaled = noto.as_scaled(header_font_size as f32);
+    let layout_h = (scaled.ascent() - scaled.descent()).ceil() as u32;
     let layout_w = {
-        let min_x = layout.first().unwrap().pixel_bounding_box().unwrap().min.x;
-        let max_x = layout.last().unwrap().pixel_bounding_box().unwrap().min.x;
+        let min_x = noto
+            .outline_glyph(glyphs.first().unwrap().glyph.clone())
+            .unwrap()
+            .px_bounds()
+            .min
+            .x;
+        let max_x = noto
+            .outline_glyph(glyphs.last().unwrap().glyph.clone())
+            .unwrap()
+            .px_bounds()
+            .min
+            .x;
         (max_x - min_x) as u32
     };
     let x_offset = (group_pic_w - layout_w) / 2;
     let y_offset = (header_h - layout_h) / 2;
-    for glyph in layout {
-        let bounding_box = match glyph.pixel_bounding_box() {
-            Some(b) => b,
-            None => {
-                warn!("Ignoring glyph without bounding box: rusttype doesn't support emoji yet.");
-                continue;
-            }
-        };
-        glyph.draw(|x, y, v| {
-            group_pic
-                .get_pixel_mut(
-                    x_offset + x + bounding_box.min.x as u32,
-                    y_offset + y + bounding_box.min.y as u32,
-                )
-                .blend(&image::Rgba([240, 240, 240, (v * 255.0) as u8]))
-        })
+    for SectionGlyph { glyph, .. } in glyphs {
+        let font = &noto;
+        // if let Some(gi) = font.glyph_raster_image(glyph.id, header_font_size) {
+        //     dbg!(gi.format);
+        //     let d = image::io::Reader::new(Cursor::new(gi.data))
+        //         .with_guessed_format()
+        //         .unwrap()
+        //         .decode()
+        //         .unwrap();
+        //     group_pic
+        //         .copy_from(&d, glyph.position.x as u32, glyph.position.y as u32)
+        //         .unwrap();
+        //     continue;
+        // }
+        if let Some(q) = font.outline_glyph(glyph) {
+            let b = q.px_bounds();
+            q.draw(|x, y, c| {
+                group_pic
+                    .get_pixel_mut(x_offset + x + b.min.x as u32, y_offset + y + b.min.y as u32)
+                    .blend(&image::Rgba([240, 240, 240, (c * 255.) as u8]))
+            });
+        }
     }
 
     // mask and tile the avatars
@@ -105,7 +133,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use image::{GenericImage, ImageBuffer, Pixel};
+    use image::ImageBuffer;
     use rand::prelude::*;
     use std::fs;
     use std::path::Path;
@@ -137,124 +165,6 @@ mod tests {
     }
 
     #[test]
-    fn stitch_5_avatars_into_1_row() -> std::io::Result<()> {
-        let mut row = image::RgbaImage::new(128 * 5, 128);
-
-        let avatar_dir = Path::new("tmp/test_avatars");
-        for (i, avatar_entry) in fs::read_dir(avatar_dir)?.take(5).enumerate() {
-            let avatar_img = image::open(avatar_entry?.path()).unwrap();
-            row.copy_from(&avatar_img, i as u32 * 128, 0).unwrap();
-        }
-
-        row.save("tmp/row.png").unwrap();
-
-        Ok(())
-    }
-
-    #[test]
-    fn stitch_all_avatars_together() -> std::io::Result<()> {
-        let avatar_dir = Path::new("tmp/test_avatars");
-        let num_of_avatars = fs::read_dir(avatar_dir)?.count();
-        let num_of_avatars_in_a_row = 5;
-        let num_of_rows = num_of_avatars / num_of_avatars_in_a_row
-            + if num_of_avatars % num_of_avatars_in_a_row == 0 {
-                0
-            } else {
-                1
-            };
-
-        let mut together = image::RgbaImage::new(128 * 5, 128 * num_of_rows as u32);
-        // println!("{:?}", together.dimensions());
-
-        for (i, avatar_entry) in fs::read_dir(avatar_dir)?.enumerate() {
-            let avatar_path = avatar_entry?.path();
-            let avatar_img = image::open(&avatar_path).unwrap();
-            let x_offset = (i % num_of_avatars_in_a_row) as u32 * 128;
-            let y_offset = (i / num_of_avatars_in_a_row) as u32 * 128;
-            // println!(
-            //     "{:#?}: {:?} {:?}",
-            //     avatar_path,
-            //     avatar_img.dimensions(),
-            //     (x_offset, y_offset)
-            // );
-            together.copy_from(&avatar_img, x_offset, y_offset).unwrap();
-        }
-
-        together.save("tmp/together.png").unwrap();
-
-        Ok(())
-    }
-
-    #[test]
-    fn mask_avatar_with_circle() {
-        // circle mask color and radius
-        let discord_color = image::Rgb([48, 48, 54]);
-        let radius: u32 = 64;
-
-        // avatar image to mask
-        let avatar_path = Path::new("avatar.png");
-        let mut avatar_img = image::open(avatar_path).unwrap().into_rgb8();
-
-        // mask the avatar cover parts outside circle with
-        for (x, y, p) in avatar_img.enumerate_pixels_mut() {
-            if (x - 64) * (x - 64) + (y - 64) * (y - 64)
-                >= radius * radius
-            {
-                p.0.copy_from_slice(&discord_color.0);
-            }
-        }
-
-        avatar_img.save("masked_avatar.png").unwrap();
-    }
-
-    #[test]
-    fn render_text_header() {
-        // prepare header image buffer
-        let header_w = 128 * 5;
-        let header_h = 64;
-        let discord_color = image::Rgba([48, 48, 54, 255]);
-        let mut header_img = ImageBuffer::from_pixel(header_w, header_h, discord_color);
-
-        // load font
-        let font = rusttype::Font::try_from_bytes(super::FONT_DATA).expect("error loading font");
-        let font_size = rusttype::Scale::uniform(54.0);
-
-        let text = "niji3rd-live-day1";
-
-        // layout the glyphs
-        let v_metrics = font.v_metrics(font_size);
-        let layout: Vec<_> = font
-            .layout(text, font_size, rusttype::point(0.0, v_metrics.ascent))
-            .collect();
-        let layout_h = (v_metrics.ascent - v_metrics.descent).ceil() as u32;
-        let layout_w = {
-            let min_x = layout.first().unwrap().pixel_bounding_box().unwrap().min.x;
-            let max_x = layout.last().unwrap().pixel_bounding_box().unwrap().min.x;
-            (max_x - min_x) as u32
-        };
-        // println!("layout_h= {:?}, layout_w= {:?}", layout_h, layout_w)
-
-        // center the render in header
-        let x_offset = (header_w - layout_w) / 2;
-        let y_offset = (header_h - layout_h) / 2;
-
-        // render the text into header image
-        for glyph in layout {
-            let bounding_box = glyph.pixel_bounding_box().unwrap();
-            glyph.draw(|x, y, v| {
-                header_img
-                    .get_pixel_mut(
-                        x_offset + x + bounding_box.min.x as u32,
-                        y_offset + y + bounding_box.min.y as u32,
-                    )
-                    .blend(&image::Rgba([240, 240, 240, f32::floor(v * 255.0) as u8]))
-            })
-        }
-
-        header_img.save("header.png").unwrap();
-    }
-
-    #[test]
     fn generate_full_group_pic() {
         generate_group_pic(
             "tmp/test_avatars",
@@ -271,6 +181,27 @@ mod tests {
             "tmp/one_avatar_group_pic.png",
             5,
             "niji3rd-live-day1",
+        );
+    }
+
+    #[test]
+    fn only_one_avatar_with_kana_kanji() {
+        generate_group_pic(
+            "tmp/test_one_avatar",
+            "tmp/one_avatar_with_kana_kanji.png",
+            5,
+            "ラブライブ!虹ヶ咲3rdライブ1日目",
+        );
+    }
+
+    /// Doesn't support emoji yet
+    #[test]
+    fn only_one_avatar_with_emoji() {
+        generate_group_pic(
+            "tmp/test_one_avatar",
+            "tmp/one_avatar_with_emoji.png",
+            5,
+            "🔥👀🌾🍛",
         );
     }
 }
