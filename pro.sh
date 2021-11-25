@@ -1,0 +1,1 @@
+set -a; . './pro.env'; set +a; $@
