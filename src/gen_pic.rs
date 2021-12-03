@@ -6,7 +6,7 @@ use glyph_brush_layout::{
     ab_glyph::{Font, FontRef, PxScale, ScaleFont},
     FontId, GlyphPositioner, Layout, SectionGeometry, SectionGlyph, SectionText,
 };
-use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba};
+use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
 use num::Integer;
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansJP-Medium.otf");
@@ -26,7 +26,7 @@ pub fn generate_group_pic<I, O, S>(
     let num_of_avatars_in_a_row = num_of_avatars_in_a_row;
     let header_h = 64;
     let header_text = header_text.as_ref();
-    let header_font_size = 54;
+    let header_font_size = 54.;
     let mask_radius = 64;
     let avatars_dir = avatars_dir.as_ref();
 
@@ -42,6 +42,45 @@ pub fn generate_group_pic<I, O, S>(
     // dbg!(group_pic.dimensions());
 
     // render the header
+    render_header_glyph_brush(&mut group_pic, header_h, header_text, header_font_size);
+
+    // mask and tile the avatars
+    for (i, avatar_path) in fs::read_dir(avatars_dir).unwrap().enumerate() {
+        let avatar_path = avatar_path.unwrap().path();
+        let mut avatar_img = image::open(&avatar_path).unwrap().into_rgba8();
+        if avatar_img.dimensions() != (128, 128) {
+            avatar_img = resize(&avatar_img, 128, 128, image::imageops::FilterType::Lanczos3);
+        }
+        for (x, y, p) in avatar_img.enumerate_pixels_mut() {
+            if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
+                >= mask_radius * mask_radius
+            {
+                p.0.copy_from_slice(&DISCORD_COLOR.0);
+            }
+        }
+        let x_offset = i as u32 % num_of_avatars_in_a_row * 128;
+        let y_offset = i as u32 / num_of_avatars_in_a_row * 128 + header_h;
+        // println!(
+        //     "{:#?}: {:?} {:?}",
+        //     avatar_path,
+        //     avatar_img.dimensions(),
+        //     (x_offset, y_offset)
+        // );
+        group_pic
+            .copy_from(&avatar_img, x_offset, y_offset)
+            .unwrap();
+    }
+
+    group_pic.save(out_group_pic_path.as_ref()).unwrap();
+}
+
+fn render_header_glyph_brush(
+    group_pic: &mut RgbaImage,
+    header_h: u32,
+    header_text: &str,
+    header_font_size: f32,
+) {
+    let group_pic_w = group_pic.width();
     let noto = FontRef::try_from_slice(FONT_DATA).expect("error loading font");
     let fonts = &[noto.clone()];
     let glyphs = Layout::default().calculate_glyphs(
@@ -98,35 +137,6 @@ pub fn generate_group_pic<I, O, S>(
             });
         }
     }
-
-    // mask and tile the avatars
-    for (i, avatar_path) in fs::read_dir(avatars_dir).unwrap().enumerate() {
-        let avatar_path = avatar_path.unwrap().path();
-        let mut avatar_img = image::open(&avatar_path).unwrap().into_rgba8();
-        if avatar_img.dimensions() != (128, 128) {
-            avatar_img = resize(&avatar_img, 128, 128, image::imageops::FilterType::Lanczos3);
-        }
-        for (x, y, p) in avatar_img.enumerate_pixels_mut() {
-            if (x as i64 - 64) * (x as i64 - 64) + (y as i64 - 64) * (y as i64 - 64)
-                >= mask_radius * mask_radius
-            {
-                p.0.copy_from_slice(&DISCORD_COLOR.0);
-            }
-        }
-        let x_offset = i as u32 % num_of_avatars_in_a_row * 128;
-        let y_offset = i as u32 / num_of_avatars_in_a_row * 128 + header_h;
-        // println!(
-        //     "{:#?}: {:?} {:?}",
-        //     avatar_path,
-        //     avatar_img.dimensions(),
-        //     (x_offset, y_offset)
-        // );
-        group_pic
-            .copy_from(&avatar_img, x_offset, y_offset)
-            .unwrap();
-    }
-
-    group_pic.save(out_group_pic_path.as_ref()).unwrap();
 }
 
 #[cfg(test)]
