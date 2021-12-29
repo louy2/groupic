@@ -10,6 +10,7 @@ use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage}
 use num::Integer;
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansJP-Medium.otf");
+const EMOJI_FONT_DATA: &[u8] = include_bytes!("../NotoColorEmoji.ttf");
 const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
 
 pub fn generate_group_pic<I, O, S>(
@@ -82,7 +83,12 @@ fn render_header_glyph_brush(
 ) {
     let group_pic_w = group_pic.width();
     let noto = FontRef::try_from_slice(FONT_DATA).expect("error loading font");
+    // let noto_emoji = FontRef::try_from_slice(EMOJI_FONT_DATA).expect("error loading emoji font");
     let fonts = &[noto.clone()];
+    // let sections: Vec<SectionText> = vec![];
+    // for (i, grapheme) in unic::segment::GraphemeIndices::new(header_text) {
+
+    // }
     let glyphs = Layout::default().calculate_glyphs(
         fonts,
         &SectionGeometry {
@@ -200,6 +206,16 @@ mod tests {
             "tmp/one_avatar_with_kana_kanji.png",
             5,
             "ラブライブ!虹ヶ咲3rdライブ1日目",
+        );
+    }
+
+    #[test]
+    fn square_group_pic() {
+        generate_group_pic(
+            "tmp/test_avatars",
+            "tmp/example_group_pic.png",
+            5,
+            "niji3rd-live-day1",
         );
     }
 

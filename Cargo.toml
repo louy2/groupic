@@ -22,6 +22,7 @@ tempdir = "0.3"
 hyper = { version = "*", features = ["client", "http1", "http2"] }
 hyper-rustls = "*"
 futures = "0.3"
+unic = "0.9"
 # twilight-model = "0.7"
 # twilight-http = { version = "0.7", features = ["tracing"] }
 # twilight-gateway = "0.7"
