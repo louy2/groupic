@@ -19,7 +19,7 @@ use twilight_cache_inmemory::{InMemoryCache, ResourceType};
 use twilight_gateway::{Event, EventTypeFlags, Intents, Shard};
 use twilight_model::application::callback::InteractionResponse;
 use twilight_model::application::command::{
-    ChannelCommandOptionData, Command, CommandOption, CommandType,
+    self, ChannelCommandOptionData, Command, CommandOption, CommandType, NumberCommandOptionData,
 };
 use twilight_model::application::interaction::application_command::CommandOptionValue;
 use twilight_model::application::interaction::Interaction;
@@ -83,6 +83,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 description: "The voice channel for group picture".into(),
                 name: "channel".into(),
                 required: true,
+            }))
+            .option(CommandOption::Integer(NumberCommandOptionData {
+                choices: vec![],
+                min_value: Some(command::CommandOptionValue::Integer(5)),
+                max_value: Some(command::CommandOptionValue::Integer(20)),
+                description: "Number of avatars in a row / number of columns".into(),
+                name: "column-count".into(),
+                required: false,
             }))
             .build(),
         ])?
@@ -216,12 +224,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         }
                         // dispatch to groupic
                         if ac.data.id == groupic_command.id.unwrap() {
-                            let cov = ac
-                                .data
-                                .options
-                                .into_iter()
+                            let mut options = ac.data.options;
+                            let cov = options
+                                .iter_mut()
                                 .find(|cdo| cdo.name == "channel")
                                 .unwrap()
+                                .clone()
                                 .value;
                             let ci = match cov {
                                 CommandOptionValue::Channel(ci) => ci,
@@ -350,8 +358,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let vn_clone = vc.name.clone();
                             let gp_clone = groupic_path.clone();
                             dbg_debug!(&avatars_dir.path().is_dir());
-                            spawn_blocking(|| {
-                                gen_pic::generate_group_pic(ad_clone, gp_clone, 5, vn_clone);
+                            use std::convert::TryFrom;
+                            let column_count = options
+                                .iter_mut()
+                                .find(|cdo| cdo.name == "column-count")
+                                .and_then(|cdo| match cdo.value {
+                                    CommandOptionValue::Integer(x) => Some(
+                                        u32::try_from(x)
+                                            .expect("column-count should be between 5 and 20"),
+                                    ),
+                                    _ => {
+                                        error!("Should get integer for column-count but instead got something else");
+                                        None
+                                    }
+                                });
+                            spawn_blocking(move || {
+                                gen_pic::generate_group_pic(
+                                    ad_clone,
+                                    gp_clone,
+                                    column_count,
+                                    vn_clone,
+                                );
                             })
                             .await?;
                             dbg_debug!(&groupic_path.is_file());

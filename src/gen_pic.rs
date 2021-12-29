@@ -7,7 +7,7 @@ use glyph_brush_layout::{
     FontId, GlyphPositioner, Layout, SectionGeometry, SectionGlyph, SectionText,
 };
 use image::{imageops::resize, GenericImage, ImageBuffer, Pixel, Rgba, RgbaImage};
-use num::Integer;
+use num::{integer::Roots, Integer};
 
 const FONT_DATA: &[u8] = include_bytes!("../NotoSansJP-Medium.otf");
 const EMOJI_FONT_DATA: &[u8] = include_bytes!("../NotoColorEmoji.ttf");
@@ -16,7 +16,7 @@ const DISCORD_COLOR: Rgba<u8> = Rgba([48, 48, 54, 255]);
 pub fn generate_group_pic<I, O, S>(
     avatars_dir: I,
     out_group_pic_path: O,
-    num_of_avatars_in_a_row: u32,
+    num_of_avatars_in_a_row: Option<u32>,
     header_text: S,
 ) where
     I: AsRef<Path>,
@@ -24,7 +24,6 @@ pub fn generate_group_pic<I, O, S>(
     S: AsRef<str>,
 {
     // configure the group pic
-    let num_of_avatars_in_a_row = num_of_avatars_in_a_row;
     let header_h = 64;
     let header_text = header_text.as_ref();
     let header_font_size = 54.;
@@ -33,6 +32,8 @@ pub fn generate_group_pic<I, O, S>(
 
     // calculate the rest of the configuration
     let num_of_avatars = fs::read_dir(avatars_dir).unwrap().count() as u32;
+    let num_of_avatars_in_a_row =
+        num_of_avatars_in_a_row.unwrap_or(core::cmp::max(num_of_avatars.sqrt(), 5));
     let num_of_rows = num_of_avatars.div_ceil(&num_of_avatars_in_a_row);
     let group_pic_w = 128 * num_of_avatars_in_a_row;
     let group_pic_h = header_h + 128 * num_of_rows;
@@ -184,7 +185,7 @@ mod tests {
         generate_group_pic(
             "tmp/test_avatars",
             "tmp/example_group_pic.png",
-            5,
+            Some(5),
             "niji3rd-live-day1",
         );
     }
@@ -194,7 +195,7 @@ mod tests {
         generate_group_pic(
             "tmp/test_one_avatar",
             "tmp/one_avatar_group_pic.png",
-            5,
+            Some(5),
             "niji3rd-live-day1",
         );
     }
@@ -204,7 +205,7 @@ mod tests {
         generate_group_pic(
             "tmp/test_one_avatar",
             "tmp/one_avatar_with_kana_kanji.png",
-            5,
+            Some(5),
             "ラブライブ!虹ヶ咲3rdライブ1日目",
         );
     }
@@ -214,7 +215,7 @@ mod tests {
         generate_group_pic(
             "tmp/test_avatars",
             "tmp/example_group_pic.png",
-            5,
+            None,
             "niji3rd-live-day1",
         );
     }
@@ -225,7 +226,7 @@ mod tests {
         generate_group_pic(
             "tmp/test_one_avatar",
             "tmp/one_avatar_with_emoji.png",
-            5,
+            Some(5),
             "🔥👀🌾🍛",
         );
     }
