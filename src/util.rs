@@ -1,5 +1,7 @@
-use twilight_http::Client;
-use twilight_model::id::GuildId;
+use twilight_http::client::InteractionClient;
+use twilight_model::id::{Id, marker::GuildMarker};
+
+type GuildId = Id<GuildMarker>;
 
 #[macro_export]
 macro_rules! dbg_debug {
@@ -18,22 +20,27 @@ macro_rules! dbg_trace {
 }
 
 #[allow(dead_code)]
-pub async fn delete_guild_commands(client: &Client, guild_id: GuildId) -> anyhow::Result<()> {
+pub async fn delete_guild_commands(client: &InteractionClient<'_>, guild_id: GuildId) -> anyhow::Result<()> {
     let guild_commands = client
-        .get_guild_commands(guild_id)?
+        .get_guild_commands(guild_id)
         .exec().await?.models().await?;
     for c in guild_commands {
         if let Some(command_id) = c.id {
-            client.delete_guild_command(guild_id, command_id)?.exec().await?;
+            client.delete_guild_command(guild_id, command_id).exec().await?;
         }
     }
     Ok(())
 }
 
 pub mod cdn {
-    use twilight_model::id::{GuildId, UserId};
+    use twilight_model::id::{Id, marker::{GuildMarker, UserMarker}};
+    type GuildId = Id<GuildMarker>;
+    type UserId = Id<UserMarker>;
+
+    use std::fmt::Display;
 
     #[allow(dead_code)]
+    #[allow(clippy::upper_case_acronyms)]
     pub enum PJWG {
         PNG,
         JPEG,
@@ -90,11 +97,11 @@ pub mod cdn {
 
     pub fn get_user_avatar<S>(user_id: UserId, user_avatar: S, format: PJWG) -> String
     where
-        S: AsRef<str>,
+        S: Display,
     {
         base!(user_avatar!(
-            user_id.0,
-            user_avatar.as_ref(),
+            user_id,
+            user_avatar.to_string(),
             format.as_ref()
         ))
     }
@@ -106,12 +113,12 @@ pub mod cdn {
         format: PJWG,
     ) -> String
     where
-        S: AsRef<str>,
+        S: Display,
     {
         base!(guild_member_avatar!(
-            guild_id.0,
-            user_id.0,
-            member_avatar.as_ref(),
+            guild_id,
+            user_id,
+            member_avatar.to_string(),
             format.as_ref()
         ))
     }

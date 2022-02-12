@@ -33,7 +33,7 @@ pub fn generate_group_pic<I, O, S>(
     // calculate the rest of the configuration
     let num_of_avatars = fs::read_dir(avatars_dir).unwrap().count() as u32;
     let num_of_avatars_in_a_row =
-        num_of_avatars_in_a_row.unwrap_or(core::cmp::max(num_of_avatars.sqrt(), 5));
+        num_of_avatars_in_a_row.unwrap_or_else(|| core::cmp::max(num_of_avatars.sqrt(), 5));
     let num_of_rows = num_of_avatars.div_ceil(&num_of_avatars_in_a_row);
     let group_pic_w = 128 * num_of_avatars_in_a_row;
     let group_pic_h = header_h + 128 * num_of_rows;

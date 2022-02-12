@@ -1,7 +1,9 @@
-use twilight_http::Client;
+use twilight_http::client::InteractionClient;
 use twilight_http::request::application::interaction::InteractionCallback;
-use twilight_model::id::InteractionId;
+use twilight_model::id::{Id, marker::InteractionMarker};
 use twilight_model::application::callback::InteractionResponse;
+
+type InteractionId = Id<InteractionMarker>;
 
 pub trait InteractionCallbackAlias {
     fn create_interaction_original<'a>(
@@ -12,7 +14,7 @@ pub trait InteractionCallbackAlias {
     ) -> InteractionCallback<'a>;
 }
 
-impl InteractionCallbackAlias for Client {
+impl InteractionCallbackAlias for InteractionClient<'_> {
     fn create_interaction_original<'a>(
         &'a self,
         interaction_id: InteractionId,

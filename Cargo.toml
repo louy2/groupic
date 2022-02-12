@@ -8,27 +8,28 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tracing = "0.1"
-tracing-subscriber = "0.3"
-tokio = { version = "1", features = ["full"] }
-tokio-stream = "0.1"
-num = "0.4"
-image = "0.23"
-rand = "0.8"
-glyph_brush_layout = "0.2"
-lazy_static = "1"
-anyhow = "1"
-tempdir = "0.3"
-hyper = { version = "*", features = ["client", "http1", "http2"] }
-hyper-rustls = "*"
-futures = "0.3"
-unic = "0.9"
-# twilight-model = "0.7"
-# twilight-http = { version = "0.7", features = ["tracing"] }
-# twilight-gateway = "0.7"
-# twilight-util = { version = "0.7", features = ["builder"]}
-twilight-model = { git = "https://github.com/twilight-rs/twilight" }
-twilight-http = { git = "https://github.com/twilight-rs/twilight", features = ["tracing"] }
-twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
-twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["builder"]}
-twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }
+tracing = "0.1.29"
+tracing-subscriber = "0.3.3"
+tokio = { version = "1.15.0", features = ["full"] }
+tokio-stream = "0.1.8"
+num = "0.4.0"
+image = "0.24.0"
+rand = "0.8.4"
+glyph_brush_layout = "0.2.3"
+lazy_static = "1.4.0"
+anyhow = "1.0.51"
+tempdir = "0.3.7"
+hyper = { version = "0.14.16", features = ["client", "http1", "http2"] }
+hyper-rustls = "0.23.0"
+futures = "0.3.17"
+unic = "0.9.0"
+twilight-model = "0.9.0"
+twilight-http = { version = "0.9.0", features = ["tracing"] }
+twilight-gateway = "0.9.0"
+twilight-util = { version = "0.9.0", features = ["builder"]}
+twilight-cache-inmemory = "0.9.0"
+# twilight-model = { git = "https://github.com/twilight-rs/twilight" }
+# twilight-http = { git = "https://github.com/twilight-rs/twilight", features = ["tracing"] }
+# twilight-gateway = { git = "https://github.com/twilight-rs/twilight" }
+# twilight-util = { git = "https://github.com/twilight-rs/twilight", features = ["builder"]}
+# twilight-cache-inmemory = { git = "https://github.com/twilight-rs/twilight" }

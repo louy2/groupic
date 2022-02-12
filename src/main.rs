@@ -13,6 +13,7 @@ use tokio_stream::StreamExt;
 use tracing::{error, info};
 
 use alias::*;
+use twilight_http::request::AttachmentFile;
 use util::*;
 
 use twilight_cache_inmemory::{InMemoryCache, ResourceType};
@@ -26,8 +27,10 @@ use twilight_model::application::interaction::Interaction;
 use twilight_model::channel::message::MessageFlags;
 use twilight_model::channel::{Channel, ChannelType, GuildChannel};
 use twilight_model::guild::Member;
-use twilight_model::id::ApplicationId;
+use twilight_model::id::{marker::ApplicationMarker, Id};
 use twilight_util::builder::command::CommandBuilder;
+
+type ApplicationId = Id<ApplicationMarker>;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -48,18 +51,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let token = std::env::var("DISCORD_BOT_TOKEN").expect("Please set DISCORD_BOT_TOKEN");
 
     let application_id = std::env::var("DISCORD_APP_ID").expect("Please set DISCORD_APP_ID");
-    let application_id = u64::from_str_radix(&application_id, 10)?;
-    let application_id = ApplicationId::new(application_id)
+    let application_id = application_id.parse::<u64>()?;
+    let application_id = ApplicationId::new_checked(application_id)
         .ok_or(anyhow::anyhow!("Invalid application id in DISCORD_APP_ID"))?;
 
     let hc = twilight_http::Client::builder()
         .token(token.clone())
-        .application_id(application_id)
         .build();
     let me = hc.current_user().exec().await?.model().await?;
     info!("Using Discord API as {}#{}", me.name, me.discriminator());
+    let ic = hc.interaction(application_id);
 
-    let commands = hc
+    let commands = ic
         .set_global_commands(&[
             CommandBuilder::new(
                 "ping".into(),
@@ -91,9 +94,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 description: "Number of avatars in a row / number of columns".into(),
                 name: "column-count".into(),
                 required: false,
+                autocomplete: false,
             }))
             .build(),
-        ])?
+        ])
         .exec()
         .await?
         .models()
@@ -149,6 +153,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             Event::InteractionCreate(x) => {
                 let x = x.0;
                 match x {
+                    Interaction::ApplicationCommand(ac)
+                        if ac.data.id == ping_command.id.unwrap() => {}
                     Interaction::ApplicationCommand(ac) => {
                         // dispatch to ping
                         if ac.data.id == ping_command.id.unwrap() {
@@ -156,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 .content("Pong".into())
                                 .flags(MessageFlags::EPHEMERAL)
                                 .build();
-                            hc.create_interaction_original(
+                            ic.create_interaction_original(
                                 ac.id,
                                 &ac.token,
                                 &InteractionResponse::ChannelMessageWithSource(res),
@@ -214,7 +220,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 .content(avatar_url)
                                 .flags(MessageFlags::EPHEMERAL)
                                 .build();
-                            hc.create_interaction_original(
+                            ic.create_interaction_original(
                                 ac.id,
                                 &ac.token,
                                 &InteractionResponse::ChannelMessageWithSource(res),
@@ -301,7 +307,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 }
                             }
                             dbg_trace!(&v_m);
-                            let v_a: Vec<_> = v_m
+                            
+
+                            // download avatars to this temp dir
+                            let avatars_dir = TempDir::new("avatars").unwrap();
+                            let avatars_dir_path = avatars_dir.path().to_owned();
+                            // construct async download tasks for each image file
+                            let https = hyper_rustls::HttpsConnectorBuilder::new()
+                                .with_native_roots()
+                                .https_only()
+                                .enable_http1()
+                                .enable_http2()
+                                .build();
+                            let rc: hyper::Client<_, hyper::Body> =
+                                hyper::Client::builder().build(https);
+                            let download_futs: Vec<_> = v_m
                                 .iter()
                                 .map(|m| match m.avatar.as_ref() {
                                     Some(s) => cdn::get_guild_member_avatar(
@@ -317,17 +337,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                         None => cdn::get_default_user_avatar(m.user.discriminator),
                                     },
                                 })
-                                .collect();
-
-                            // download avatars to this temp dir
-                            let avatars_dir = TempDir::new("avatars").unwrap();
-                            let avatars_dir_path = avatars_dir.path().to_owned();
-                            // construct async download tasks for each image file
-                            let https = hyper_rustls::HttpsConnector::with_native_roots();
-                            let rc: hyper::Client<_, hyper::Body> =
-                                hyper::Client::builder().build(https);
-                            let download_futs: Vec<_> = v_a
-                                .into_iter()
                                 .map(move |url| {
                                     let avatars_dir_path = avatars_dir_path.clone();
                                     let rc = rc.clone();
@@ -395,7 +404,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 .content(content)
                                 // .flags(MessageFlags::EPHEMERAL)
                                 .build();
-                            hc.create_interaction_original(
+                            ic.create_interaction_original(
                                 ac.id,
                                 &ac.token,
                                 &InteractionResponse::ChannelMessageWithSource(cbd),
@@ -405,8 +414,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let groupic_bytes = fs::read(groupic_path)
                                 .await
                                 .with_context(|| "Failed to read groupic.png")?;
-                            hc.update_interaction_original(&ac.token)?
-                                .files(&[("groupic.png", &groupic_bytes)])
+                            let af = AttachmentFile::from_bytes("groupic.png", &groupic_bytes);
+                            ic.update_interaction_original(&ac.token)
+                                .attach(&[af])
                                 .exec()
                                 .await?;
                         }
